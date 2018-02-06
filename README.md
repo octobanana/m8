@@ -77,7 +77,7 @@ int main()
 ```
 
 ## Examples
-After building and installing M8, try running it on the `./examples/basic/src/main.cc` file.  
+After building and installing M8, try running it on the `./examples/basic/src/main_m8.cc` file.  
 ```bash
 cd ./examples/basic/src
 m8 -f main_m8.cc -o main.cc
