@@ -5,7 +5,7 @@ M8 is a framework for building macros that match a defined regex, run a c++ func
 ## Building
 The following shell commands will build the project:
 ```bash
-$ git clone <repo_name>
+$ git clone --recurse-submodules <repo_name>
 $ cd <repo_name>
 $ ./build.sh -r
 ```
