@@ -14,7 +14,7 @@ To build the debug version, run the build script without the -r flag.
 To install, run the install script.  
 
 ## Usage
-Let's create a new macro that will output a c++ function that will output a c++ comment block with the authors name, timestamp, and version number.  
+Let's create a new macro that will output a c++ comment block with the authors name, timestamp, version number and description.  
 Create a new file called test.cc:
 ```cpp
 // test.cc
@@ -30,7 +30,7 @@ int main()
 
 Now let's define our macro.  
 The `./src/m8.hh` file is where macros are defined.  
-Add our macro the the macro map data structure:
+Add our macro to the macro map data structure:
 ```cpp
 // macro map
 // (name) -> (info, usage, regex, fn)
@@ -60,7 +60,7 @@ auto const fn_comment_header = [](auto& res, auto const& match) {
 };
 ```
 The response string will replace the calling macro.  
-Building and running our example on our `test.cc` file will output:
+Building and running the example on `test.cc` will output:
 ```cpp
 // test.cc
 
