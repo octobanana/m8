@@ -53,10 +53,10 @@ The default location for the config file is `~/.m8.json`.
 The grammer for a macro is as follows:  
 ```
 macro       : [delim_start][name] [args][delim_end]
-delim_start : a unique string of characters | integers | symbols, ex. "#[M8["
+delim_start : a unique string of characters | integers | symbols
 name        : string of characters naming the macro
 args        : the arguments to be passed to the macro
-delim_end   : a unique string of characters | integers | symbols, ex. "]]
+delim_end   : a unique string of characters | integers | symbols
 ```
 
 The delimiters can be changed with the __--start__ and __--end__ flags at runtime.  
