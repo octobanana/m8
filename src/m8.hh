@@ -5,85 +5,70 @@
 #include <sstream>
 #include <iostream>
 #include <fstream>
-#include <thread>
-#include <chrono>
 #include <map>
 #include <vector>
 #include <regex>
 #include <functional>
-#include <ctime>
 
-struct macro
+class M8
 {
-  std::string info;
-  std::string usage;
-  std::string regex;
-  std::function<int(std::string&, std::smatch const&)> fn;
-}; // struct M8
+  using macro_fn = std::function<int(std::string&, std::smatch const&)>;
 
-// helper functions
+public:
+  M8();
+  ~M8();
 
-std::string repeat(std::string val, int num)
-{
-  if (num < 2)
+  void set_debug(bool const& val);
+
+  void set_macro(std::string const& name, std::string const& info, std::string const& usage,
+    std::string const& regex);
+
+  void set_macro(std::string const& name, std::string const& info, std::string const& usage,
+    std::string const& regex, macro_fn fn);
+
+  void delimit(std::string const& delim_start, std::string const& delim_end);
+
+  std::string list_macros() const;
+
+  void set_config(std::string file_name);
+
+  std::string summary() const;
+
+  void run(std::string const& ifile, std::string const& ofile);
+
+private:
+  std::ifstream ifile_;
+  std::ofstream ofile_;
+
+  int macro_count_ {0};
+  int warning_count_ {0};
+  int pass_count_ {0};
+
+  bool use_stdout_ {false};
+  bool debug_ {false};
+
+  std::string start_ {"#[M8["};
+  std::string end_ {"]]"};
+
+  enum class Mtype
   {
-    return val;
-  }
-  std::string out;
-  for (int i = 0; i < num; ++i)
+    internal,
+    external
+  };
+
+  struct Macro
   {
-    out.append(val);
-  }
-  return out;
-}
+    Mtype type;
+    std::string info;
+    std::string usage;
+    std::string regex;
+    macro_fn fn;
+  }; // struct Macro
 
-// fn lambdas
-// where s = a reference to the output string
-// and m = std::smatch of the parsed regex
+  std::map<std::string, Macro> macros;
 
-// m[0] is the full regex
-// m[1] is the captured string value
-// m[2] is the captured integer value
-auto const fn_repeat = [](auto& s, auto const& m) {
-  auto res = repeat(std::string(m[1]), std::stoi(std::string(m[2])));
-  std::stringstream ss;
-  ss << "\"" << res << "\"";
-  s = ss.str();
-  return 0;
-};
+  std::string env_var(std::string const& var) const;
 
-// m[0] is the full regex
-// m[1] is the captured type as a string value
-auto const fn_add = [](auto& s, auto const& m) {
-  auto type = std::string(m[1]);
-  std::stringstream ss;
-  ss << type << "add(" << type << ") x, " << type << " y)\n"
-     << "{\n"
-     << "return x + y"
-     << "}";
-  s = ss.str();
-  return 0;
-};
-
-auto const fn_comment_header = [](auto& s, auto const& m) {
-  std::stringstream ss;
-  ss << "// timestamp:   " << std::time(nullptr) << "\n";
-  ss << "// Version:     " << m[1] << "\n";
-  ss << "// Author:      " << m[2] << "\n";
-  ss << "// Description: " << m[3];
-  s = ss.str();
-  return 0;
-};
-
-// macro map
-// (name) -> (info, usage, regex, fn)
-std::map<std::string, macro> M8 {
-{"repeat", {"repeats the given input by n", "repeat(str, int)",
-  "^repeat\\((.+),([0-9]+)\\)$", fn_repeat}},
-{"add", {"template add function", "add(type)",
-  "^add\\((.+)\\)$", fn_add}},
-{"comment_header", {"outputs the authors name, timestamp, version, and description in a c++ comment block", "comment_header(version, author, description)",
-  "^comment_header\\(([.0-9]+), \"(.+)\", \"(.+)\"\\)$", fn_comment_header}},
-};
+}; // class M8
 
 #endif // OB_M8_HH
