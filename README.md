@@ -139,7 +139,7 @@ void macros(M8& m8)
 
   m8.set_macro("comment_header",
     "outputs the authors name, timestamp, version, and description in a c++ comment block",
-    "comment_header(version, author, description)",
+    "comment_header version, author, description",
     "^([.0-9]+?), \"(.+?)\", \"(.+?)\"$",
     fn_comment_header);
 }
