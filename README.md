@@ -51,23 +51,25 @@ The default location for the config file is `~/.m8.json`.
 
 ## Syntax
 The grammer for a macro is as follows:  
-macro       : [delim_start][name] [args][delim_end]  
-delim_start : a unique string of characters | integers | symbols, ex. "#[M8["  
-name        : string of characters naming the macro  
-args        : the arguments to be passed to the macro  
-delim_end   : a unique string of characters | integers | symbols, ex. "]]"  
+```
+macro       : [delim_start][name] [args][delim_end]
+delim_start : a unique string of characters | integers | symbols, ex. "#[M8["
+name        : string of characters naming the macro
+args        : the arguments to be passed to the macro
+delim_end   : a unique string of characters | integers | symbols, ex. "]]
+```
 
 The delimiters can be changed with the __--start__ and __--end__ flags at runtime.  
 Inbetween the delimiters is the macro name and arguments seperated by a single space character. How the arguments are passed depends on how the macros regex is defined. The regex uses capture groups to parse the arguments sent to the macro.  
 
-An example macro where:  
-delim_start="[["  
-delim_end="]]"  
-name="subtract"  
-args="8 4"  
-with a regex of "([0-9]+) ([0-9]+)"  
-
-`[[subtract 8 4]]`  
+An example macro with a regex of "([0-9]+) ([0-9]+)":  
+```
+macro       : "[[subtract 8 4]]"
+delim_start : "[["
+name        : "subtract"
+args        : "8 4"
+delim_end   : "]]"
+```
 
 ## Usage
 After building and installing M8, try running it on the `./examples/basic/src/main_m8.cc` file.  
