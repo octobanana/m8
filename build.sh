@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-# source environment variables
-source ./env.sh
-
 BUILD_TYPE="Debug"
 
 if [[ $# > 0 ]]; then
@@ -11,29 +8,28 @@ if [[ $# > 0 ]]; then
     BUILD_TYPE="Debug"
   elif [[ $1 == "-r" ]]; then
     BUILD_TYPE="Release"
+  else
+    printf "usage: ./build.sh [-d|-r]\n";
+    exit 1
   fi
 fi
 
+# source environment variables
+source ./env.sh
+
+printf "\nBuilding ${APP} in ${BUILD_TYPE} mode\n"
+
 if [[ ${BUILD_TYPE} == "Debug" ]]; then
-  # run tests
-  # ./test.sh
-
-  printf "\nBuilding ${APP}\n"
-
   printf "\nCompiling ${APP}\n"
   mkdir -p build/debug
   cd build/debug
   cmake ../../ -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
   time make
-  cd ../../
 
 elif [[ ${BUILD_TYPE} == "Release" ]]; then
-  printf "\nBuilding ${APP}\n"
-
   printf "\nCompiling ${APP}\n"
   mkdir -p build/release
   cd build/release
   cmake ../../ -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
   time make
-  cd ../../
 fi

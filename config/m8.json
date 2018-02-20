@@ -1,0 +1,16 @@
+{
+  "macros": [
+    {
+      "name": "program_one",
+      "info": "describe what the macro does",
+      "usage": "program_one <args>",
+      "regex": "^(.*)$"
+    },
+    {
+      "name": "printf",
+      "info": "use the printf shell command",
+      "usage": "printf <args> EOF",
+      "regex": "^(.*?) EOF$"
+    }
+  ]
+}
