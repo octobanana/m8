@@ -1,5 +1,6 @@
 #include "m8.hh"
 #include "sys_command.hh"
+#include "http.hh"
 
 #include "json.hh"
 using Json = nlohmann::json;
@@ -16,6 +17,7 @@ using Json = nlohmann::json;
 #include <functional>
 #include <ctime>
 #include <stdexcept>
+#include <future>
 
 M8::M8()
 {
@@ -30,16 +32,34 @@ void M8::set_debug(bool const& val)
   debug_ = val;
 }
 
-void M8::set_macro(std::string const& name, std::string const& info, std::string const& usage,
-  std::string const& regex)
+void M8::set_macro(std::string const& name, std::string const& info,
+  std::string const& usage, std::string const& regex)
 {
-  macros[name] = {Mtype::external, info, usage, regex, nullptr};
+  if (macros.find(name) != macros.end())
+  {
+    throw std::logic_error("multiple definitions of macro: " + name);
+  }
+  macros[name] = {Mtype::external, info, usage, regex, "", nullptr};
 }
 
-void M8::set_macro(std::string const& name, std::string const& info, std::string const& usage,
-  std::string const& regex, macro_fn fn)
+void M8::set_macro(std::string const& name, std::string const& info,
+  std::string const& usage, std::string const& regex, std::string const& url)
 {
-  macros[name] = {Mtype::internal, info, usage, regex, fn};
+  if (macros.find(name) != macros.end())
+  {
+    throw std::logic_error("multiple definitions of macro: " + name);
+  }
+  macros[name] = {Mtype::remote, info, usage, regex, url, nullptr};
+}
+
+void M8::set_macro(std::string const& name, std::string const& info,
+  std::string const& usage, std::string const& regex, macro_fn fn)
+{
+  if (macros.find(name) != macros.end())
+  {
+    throw std::logic_error("multiple definitions of macro: " + name);
+  }
+  macros[name] = {Mtype::internal, info, usage, regex, "", fn};
 }
 
 void M8::delimit(std::string const& delim_start, std::string const& delim_end)
@@ -97,12 +117,26 @@ void M8::set_config(std::string file_name)
   Json j = Json::parse(content);
   for (auto const& e : j["macros"])
   {
-    set_macro(
-      e["name"].get<std::string>(),
-      e["info"].get<std::string>(),
-      e["usage"].get<std::string>(),
-      e["regex"].get<std::string>()
-      );
+    // add remote macro
+    if (e.count("url") == 1)
+    {
+      set_macro(
+        e["name"].get<std::string>(),
+        e["info"].get<std::string>(),
+        e["usage"].get<std::string>(),
+        e["regex"].get<std::string>(),
+        e["url"].get<std::string>());
+    }
+
+    // add external macro
+    else
+    {
+      set_macro(
+        e["name"].get<std::string>(),
+        e["info"].get<std::string>(),
+        e["usage"].get<std::string>(),
+        e["regex"].get<std::string>());
+    }
   }
   file.close();
 }
@@ -173,7 +207,6 @@ void M8::run(std::string const& ifile, std::string const& ofile)
 
     std::function<int(std::string::size_type pos_start, std::string::size_type pos_end, int depth)> const
       find_and_replace = [&](std::string::size_type pos_start, std::string::size_type pos_end, int depth) {
-      // do
       for (/* */; pos_start != std::string::npos; ++pos_start)
       {
         if (debug_)
@@ -245,6 +278,48 @@ void M8::run(std::string const& ifile, std::string const& ofile)
             auto& func = it->second.fn;
             ec = func(res, match);
           }
+          else if (it->second.type == Mtype::remote)
+          {
+            // remote macro
+            Http api;
+            api.req.method = "POST";
+            api.req.headers.emplace_back("content-type: application/json");
+            api.req.url = it->second.url;
+
+            Json data;
+            data["name"] = it->first;
+            data["args"] = match;
+            api.req.data = data.dump();
+
+            std::cout << "Remote macro call -> " << it->first << "\n";
+            std::future<int> send {std::async(std::launch::async, [&]() {
+              api.run();
+              int status_code = api.res.status;
+              if (status_code != 200)
+              {
+                return -1;
+              }
+              else
+              {
+                res = api.res.body;
+                return 0;
+              }
+            })};
+
+            std::future_status fstatus;
+            do
+            {
+              fstatus = send.wait_for(std::chrono::milliseconds(250));
+              std::cout << "." << std::flush;
+            }
+            while (fstatus != std::future_status::ready);
+
+            ec = send.get();
+            if (ec == 0)
+              std::cout << "\033[2K\r" << "Success: remote call\n";
+            else
+              std::cout << "\033[2K\r" << "Error: remote call\n";
+          }
           else
           {
             // external macro
@@ -289,7 +364,6 @@ void M8::run(std::string const& ifile, std::string const& ofile)
           pos_start = pos_end;
         }
       }
-      // while (pos_start != std::string::npos);
 
       return 0;
     };

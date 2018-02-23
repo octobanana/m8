@@ -1,16 +1,17 @@
 {
   "macros": [
     {
-      "name": "program_one",
-      "info": "describe what the macro does",
-      "usage": "program_one <args>",
+      "name": "program_external",
+      "info": "defines an external macro call",
+      "usage": "program_external <args>",
       "regex": "^(.*)$"
     },
     {
-      "name": "printf",
-      "info": "use the printf shell command",
-      "usage": "printf <args> EOF",
-      "regex": "^(.*?) EOF$"
+      "name": "program_remote",
+      "info": "defines a remote macro call",
+      "usage": "program_remote <args>",
+      "regex": "^(.*?)$",
+      "url": "http://localhost:8080/m8"
     }
   ]
 }

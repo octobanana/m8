@@ -31,6 +31,7 @@ set (SOURCES
   src/m8.cc
   src/macros.cc
   src/sys_command.cc
+  src/http.cc
 )
 
 set (HEADERS
@@ -44,6 +45,8 @@ add_executable (
 
 target_link_libraries (
   ${TARGET}
+  curl
+  pthread
 )
 
 install (TARGETS ${TARGET} DESTINATION "/usr/local/bin")

@@ -20,11 +20,14 @@ public:
 
   void set_debug(bool const& val);
 
-  void set_macro(std::string const& name, std::string const& info, std::string const& usage,
-    std::string const& regex);
+  void set_macro(std::string const& name, std::string const& info,
+    std::string const& usage, std::string const& regex);
 
-  void set_macro(std::string const& name, std::string const& info, std::string const& usage,
-    std::string const& regex, macro_fn fn);
+  void set_macro(std::string const& name, std::string const& info,
+    std::string const& usage, std::string const& regex, std::string const& url);
+
+  void set_macro(std::string const& name, std::string const& info,
+    std::string const& usage, std::string const& regex, macro_fn fn);
 
   void delimit(std::string const& delim_start, std::string const& delim_end);
 
@@ -53,7 +56,8 @@ private:
   enum class Mtype
   {
     internal,
-    external
+    external,
+    remote
   };
 
   struct Macro
@@ -62,6 +66,7 @@ private:
     std::string info;
     std::string usage;
     std::string regex;
+    std::string url;
     macro_fn fn;
   }; // struct Macro
 
