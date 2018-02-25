@@ -84,6 +84,20 @@ std::string M8::list_macros() const
   return ss.str();
 }
 
+std::string M8::macro_info(std::string const& name) const
+{
+  if (macros.find(name) == macros.end())
+  {
+    return "Error: macro '" + name + "' not found\n";
+  }
+  auto const& e = macros.at(name);
+  std::stringstream ss; ss
+  << e.usage << "\n"
+  << "  " << e.info << "\n"
+  << "  " << e.regex << "\n";
+  return ss.str();
+}
+
 void M8::set_config(std::string file_name)
 {
   // add external macros
@@ -145,9 +159,12 @@ std::string M8::summary() const
 {
   std::stringstream ss; ss
   << "\nSummary\n"
+  << "  Total    " << macro_count_ << "\n"
   << "  passes   " << pass_count_ << "\n"
   << "  warnings " << warning_count_ << "\n"
-  << "  Macros   " << macro_count_ << "\n";
+  << "  Internal " << internal_count_ << "\n"
+  << "  External " << external_count_ << "\n"
+  << "  Remote   " << remote_count_ << "\n";
   return ss.str();
 }
 
@@ -161,7 +178,26 @@ void M8::run(std::string const& ifile, std::string const& ofile)
   }
 
   // TODO incrementally read file
-  // TODO keep track of line for errors/warnings
+
+  // getline
+  // store line number
+  // search for start
+  // if found store start line:column
+  // search for additional start
+  // if found recurse
+  // search for end
+  // if found store end line:column
+  // read macro call into string buffer
+  // perform macro
+  // store result in struct
+  // repeat until eof
+
+  // back to start of file
+  // getline to output file
+  // until macro pos found
+  // output macro result
+  // continue until eof
+
   // read entire file into string
   std::string text;
   text.assign((std::istreambuf_iterator<char>(ifile_)),
@@ -275,12 +311,16 @@ void M8::run(std::string const& ifile, std::string const& ofile)
           if (it->second.type == Mtype::internal)
           {
             // internal macro
+            ++internal_count_;
+
             auto& func = it->second.fn;
             ec = func(res, match);
           }
           else if (it->second.type == Mtype::remote)
           {
             // remote macro
+            ++remote_count_;
+
             Http api;
             api.req.method = "POST";
             api.req.headers.emplace_back("content-type: application/json");
@@ -323,6 +363,8 @@ void M8::run(std::string const& ifile, std::string const& ofile)
           else
           {
             // external macro
+            ++external_count_;
+
             std::string m_args;
             for (size_t i = 1; i < match.size(); ++i)
             {

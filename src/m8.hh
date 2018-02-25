@@ -20,18 +20,23 @@ public:
 
   void set_debug(bool const& val);
 
+  // set external macro
   void set_macro(std::string const& name, std::string const& info,
     std::string const& usage, std::string const& regex);
 
+  // set remote macro
   void set_macro(std::string const& name, std::string const& info,
     std::string const& usage, std::string const& regex, std::string const& url);
 
+  // set internal macro
   void set_macro(std::string const& name, std::string const& info,
     std::string const& usage, std::string const& regex, macro_fn fn);
 
   void delimit(std::string const& delim_start, std::string const& delim_end);
 
   std::string list_macros() const;
+
+  std::string macro_info(std::string const& name) const;
 
   void set_config(std::string file_name);
 
@@ -43,9 +48,15 @@ private:
   std::ifstream ifile_;
   std::ofstream ofile_;
 
+  // general stats
   int macro_count_ {0};
   int warning_count_ {0};
   int pass_count_ {0};
+
+  // macro stats
+  int internal_count_ {0};
+  int external_count_ {0};
+  int remote_count_ {0};
 
   bool use_stdout_ {false};
   bool debug_ {false};

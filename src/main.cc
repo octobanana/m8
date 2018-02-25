@@ -35,13 +35,18 @@ int program_options(Parg& pg)
   });
   pg.author("Brett Robinson (octobanana) <octobanana.dev@gmail.com>");
 
-  // flags
+  // singular flags
   pg.set("help,h", "print the help output");
   pg.set("version,v", "print the program version");
-  pg.set("debug,d", "print out debug information, useful for debugging macro regexes");
   pg.set("list", "list all defined macros");
 
-  // options
+  // combinable flags
+  pg.set("debug,d", "print out debug information, useful for debugging macro regexes");
+
+  // singular options
+  pg.set("info", "", "str", "view informatin on specific macro");
+
+  // combinable options
   pg.set("config,c", "", "file_name", "the config file");
   pg.set("file,f", "", "file_name", "the input file");
   pg.set("output,o", "", "file_name", "the output file");
@@ -104,6 +109,13 @@ int start_m8(Parg& pg)
     if (pg.get<bool>("list"))
     {
       std::cout << m8.list_macros();
+      return 0;
+    }
+
+    // output info on macro if --info option given
+    if (pg.find("info"))
+    {
+      std::cout << m8.macro_info(pg.get("info"));
       return 0;
     }
 
