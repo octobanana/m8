@@ -93,6 +93,13 @@ A list of some of the builtin/example macros:
 * __repeat__ -> repeats a given string _n_ number of times
 
 ## Extending
+There are three types of macros, internal, external, and remote.  
+
+__External__ macros can be written in any language, with their interface defined in m8's json config file.  
+
+__Remote__ macros can be any http server, with their interface defined in m8's json config file as well.  
+
+__Internal__ macros are defined within m8, written in c++.  
 
 ### External Program Macro
 M8 can run external programs, so macros can be written in any language.  
@@ -114,6 +121,44 @@ Requirements of an external program:
 * should exist and be in your shell path
 * able to parse and read the captured regex arguments that are sent to it
 * print the output string to stdout
+
+### Remote Program Macro
+Remote macros are defined similar to an external macro.  
+```json
+{
+  "macros": [
+    {
+      "name": "program_name",
+      "info": "describe what the macro does",
+      "usage": "program_name <args>",
+      "regex": "^(.*)$",
+      "url": "http://127.0.0.1:8080"
+    }
+  ]
+}
+```
+The difference between defining an external and remote macro is the addition of the url parameter.  
+The url should point to an http/https server that can handle the defined macro.  
+When a remote macro runs, it sends a json object to the remote server.
+The json request sent to the server will contain the following:  
+```json
+{
+  "name": "program_name",
+  "args": [
+    "the full matched regex",
+    "regex capture group 1",
+    "regex capture group 2",
+    "regex capture group 3",
+    ...
+  ]
+}
+```
+The server should read the name and check if it exists, if it does, process the apropriate macro call, reading the arguments if necessary from the array of strings called args. Lastly, send back the response string in plain text in the body. Any other status code than 200 will be interpreted as an error.  
+
+Requirements of a server:  
+* accept a json object
+* parse and run corresponding macro call
+* return response string
 
 ### Internal C++ Macro
 Let's create a new macro that will output a c++ comment block with the authors name, timestamp, version number and description.  
