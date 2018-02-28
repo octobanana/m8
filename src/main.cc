@@ -18,7 +18,7 @@ int start_m8(Parg& pg);
 
 int program_options(Parg& pg)
 {
-  pg.name("m8").version("0.2.0 (02.16.2018)");
+  pg.name("m8").version("0.2.1 (26.02.2018)");
   pg.description("a meta programming tool");
   pg.usage("[flags] [options] [--] [arguments]");
   pg.usage("[-f 'input_file'] [-o 'output_file'] [-c 'config file'] [-s 'start_delim'] [-e 'end_delim'] [d]");
@@ -99,7 +99,7 @@ int start_m8(Parg& pg)
     // set start and end delimiters
     if (pg.find("start") && pg.find("end"))
     {
-      m8.delimit(pg.get("start"), pg.get("end"));
+      m8.set_delimits(pg.get("start"), pg.get("end"));
     }
 
     // add internal macros
@@ -145,14 +145,8 @@ int main(int argc, char *argv[])
 {
   Parg pg {argc, argv};
   int pstatus {program_options(pg)};
-  if (pstatus > 0)
-  {
-    return 0;
-  }
-  else if (pstatus < 0)
-  {
-    return 1;
-  }
+  if (pstatus > 0) return 0;
+  if (pstatus < 0) return 1;
 
   return start_m8(pg);
 }

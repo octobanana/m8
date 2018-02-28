@@ -1,4 +1,6 @@
 #include "m8.hh"
+#include "parser.hh"
+using Parser = OB::Parser;
 #include "sys_command.hh"
 #include "http.hh"
 
@@ -18,6 +20,8 @@ using Json = nlohmann::json;
 #include <ctime>
 #include <stdexcept>
 #include <future>
+#include <iterator>
+#include <stack>
 
 M8::M8()
 {
@@ -39,7 +43,7 @@ void M8::set_macro(std::string const& name, std::string const& info,
   {
     throw std::logic_error("multiple definitions of macro: " + name);
   }
-  macros[name] = {Mtype::external, info, usage, regex, "", nullptr};
+  macros[name] = {Mtype::external, name, info, usage, regex, "", nullptr};
 }
 
 void M8::set_macro(std::string const& name, std::string const& info,
@@ -49,7 +53,7 @@ void M8::set_macro(std::string const& name, std::string const& info,
   {
     throw std::logic_error("multiple definitions of macro: " + name);
   }
-  macros[name] = {Mtype::remote, info, usage, regex, url, nullptr};
+  macros[name] = {Mtype::remote, name, info, usage, regex, url, nullptr};
 }
 
 void M8::set_macro(std::string const& name, std::string const& info,
@@ -59,13 +63,13 @@ void M8::set_macro(std::string const& name, std::string const& info,
   {
     throw std::logic_error("multiple definitions of macro: " + name);
   }
-  macros[name] = {Mtype::internal, info, usage, regex, "", fn};
+  macros[name] = {Mtype::internal, name, info, usage, regex, "", fn};
 }
 
-void M8::delimit(std::string const& delim_start, std::string const& delim_end)
+void M8::set_delimits(std::string const& delim_start, std::string const& delim_end)
 {
-  start_ = delim_start;
-  end_ = delim_end;
+  delim_start_ = delim_start;
+  delim_end_ = delim_end;
 }
 
 std::string M8::list_macros() const
@@ -170,6 +174,149 @@ std::string M8::summary() const
 
 void M8::run(std::string const& ifile, std::string const& ofile)
 {
+  struct Tmacro
+  {
+    uint32_t line_start {0};
+    uint32_t line_end {0};
+    size_t begin {0};
+    size_t end {0};
+    std::string name;
+    std::string fn;
+    std::vector<Tmacro> children;
+    std::string res;
+  };
+  std::vector<Tmacro> ast;
+  std::stack<Tmacro> stk;
+
+  // init the parser obj with the input file
+  Parser p {ifile};
+
+  size_t pos_start {0};
+  size_t pos_end {0};
+
+  std::string line;
+  while(p.get_next(line))
+  {
+    if (line.empty()) continue;
+
+    // debug
+    std::cout << "[debug][m8][run][line] " << line << "\n";
+
+    pos_start = line.find(delim_start_, 0);
+    pos_end = line.find(delim_end_, 0);
+
+    if (pos_start == std::string::npos && pos_end == std::string::npos)
+    {
+      continue;
+    }
+
+    // parse line char by char for either start or end delim
+    for (size_t i = 0; i < line.size(); ++i)
+    {
+
+      if (line.at(i) == delim_start_.at(0))
+      {
+        size_t pos_start = line.find(delim_start_, i);
+        if (pos_start != std::string::npos)
+        {
+          //debug
+          std::cout << "[debug][m8][run][pos_start] " << pos_start << "\n";
+
+          auto t = Tmacro {};
+          t.line_start = p.current_line();
+          t.begin = pos_start;
+          stk.push(t);ne.size(); ++i)
+    {
+
+      if (line.at(i) == delim_start_.at(0))
+      {
+        size_t pos_start = line.find(delim_start_, i);
+        if (pos_start != std::string::npos)
+        {ne.size(); ++i)
+    {
+
+      if (line.at(i) == delim_start_.at(0))
+      {
+        size_t pos_start = line.find(delim_start_, i);
+        if (pos_start != std::string::npos)
+        {
+          //debug
+          std::cout << "[debug][m8][run][pos_start] " << pos_start << "\n";
+
+          auto t = Tmacro {};
+          t.line_start = p.current_line();
+          t.begin = pos_start;
+          stk.push(t);
+
+          i += delim_start_.size();
+
+
+          //debug
+          std::cout << "[debug][m8][run][pos_start] " << pos_start << "\n";
+
+          auto t = Tmacro {};
+          t.line_start = p.current_line();
+          t.begin = pos_start;
+          stk.push(t);
+
+          i += delim_start_.size();
+
+
+
+          i += delim_start_.size();
+
+          continue;
+        }
+      }
+
+      if (line.at(i) == delim_end_.at(0))
+      {
+        size_t pos_end = line.find(delim_end_, i);
+        if (pos_end != std::string::npos)
+        {
+          //debug
+          std::cout << "[debug][m8][run][pos_end] " << pos_end << "\n";
+
+          if (stk.empty())
+          {
+            throw std::runtime_error("missing matching delimiter");
+          }
+          else
+          {
+            auto& t = stk.top();
+            t.line_end = p.current_line();
+            t.end = pos_end;
+            ast.emplace_back(t);
+            stk.pop();
+          }
+
+          i += delim_end_.size();
+
+          continue;
+        }
+      }
+
+    }
+
+  }
+
+  // debug
+  for (auto const& e : ast)
+  {
+    std::stringstream ss; ss
+    << "line     : " << e.line_start << "\n"
+    << "begin    : " << e.begin << "\n"
+    << "line     : " << e.line_end << "\n"
+    << "end      : " << e.end << "\n"
+    << "children : " << e.children.size() << "\n"
+    << "\n";
+    std::cerr << ss.str();
+  }
+
+}
+
+void M8::run_(std::string const& ifile, std::string const& ofile)
+{
   // check the input file
   ifile_.open(ifile);
   if (! ifile_.is_open())
@@ -220,12 +367,7 @@ void M8::run(std::string const& ifile, std::string const& ofile)
     }
   }
 
-  // find and replace macros
-  size_t len_start {start_.length()};
-  size_t len_end {end_.length()};
-  size_t len_total {len_start + len_end};
-
-  bool done {true};
+  // bool done {true};
 
   // loop for multiple passes to make sure all macros were found
   // do
@@ -250,8 +392,8 @@ void M8::run(std::string const& ifile, std::string const& ofile)
           std::cerr << "Debug: depth -> " << depth << "\n";
         }
 
-        pos_start = text.find(start_, pos_start);
-        pos_end = text.find(end_, pos_start);
+        pos_start = text.find(delim_start_, pos_start);
+        pos_end = text.find(delim_end_, pos_start);
 
         if (pos_start == std::string::npos || pos_end == std::string::npos)
         {
@@ -259,12 +401,12 @@ void M8::run(std::string const& ifile, std::string const& ofile)
         }
 
         // if additional start delim is found before end delim, recurse
-        if (text.substr(pos_start + 1, pos_end).find(start_, 0) != std::string::npos)
+        if (text.substr(pos_start + 1, pos_end).find(delim_start_, 0) != std::string::npos)
         {
           find_and_replace(pos_start + 1, pos_end, depth + 1);
 
           // find the new end delim
-          pos_end = text.find(end_, pos_start);
+          pos_end = text.find(delim_end_, pos_start);
           if (pos_end == std::string::npos)
           {
             break;
@@ -310,69 +452,15 @@ void M8::run(std::string const& ifile, std::string const& ofile)
 
           if (it->second.type == Mtype::internal)
           {
-            // internal macro
-            ++internal_count_;
-
-            auto& func = it->second.fn;
-            ec = func(res, match);
+            ec = run_internal(it->second, res, match, it->second.fn);
           }
           else if (it->second.type == Mtype::remote)
           {
-            // remote macro
-            ++remote_count_;
-
-            Http api;
-            api.req.method = "POST";
-            api.req.headers.emplace_back("content-type: application/json");
-            api.req.url = it->second.url;
-
-            Json data;
-            data["name"] = it->first;
-            data["args"] = match;
-            api.req.data = data.dump();
-
-            std::cout << "Remote macro call -> " << it->first << "\n";
-            std::future<int> send {std::async(std::launch::async, [&]() {
-              api.run();
-              int status_code = api.res.status;
-              if (status_code != 200)
-              {
-                return -1;
-              }
-              else
-              {
-                res = api.res.body;
-                return 0;
-              }
-            })};
-
-            std::future_status fstatus;
-            do
-            {
-              fstatus = send.wait_for(std::chrono::milliseconds(250));
-              std::cout << "." << std::flush;
-            }
-            while (fstatus != std::future_status::ready);
-
-            ec = send.get();
-            if (ec == 0)
-              std::cout << "\033[2K\r" << "Success: remote call\n";
-            else
-              std::cout << "\033[2K\r" << "Error: remote call\n";
+            ec = run_remote(it->second, res, match, it->second.fn);
           }
           else
           {
-            // external macro
-            ++external_count_;
-
-            std::string m_args;
-            for (size_t i = 1; i < match.size(); ++i)
-            {
-              m_args += match[i];
-              if (i < match.size() - 1)
-                m_args += " ";
-            }
-            ec = exec(res, name + " " + m_args);
+            ec = run_external(it->second, res, match, it->second.fn);
           }
 
           // TODO handle when function return error
@@ -427,6 +515,73 @@ void M8::run(std::string const& ifile, std::string const& ofile)
     // close output file
     ofile_.close();
   }
+}
+
+int M8::run_internal(Macro macro, std::string& res, std::smatch const match, macro_fn fn)
+{
+  ++internal_count_;
+
+  return fn(res, match);
+}
+
+int M8::run_external(Macro macro, std::string& res, std::smatch const match, macro_fn fn)
+{
+  ++external_count_;
+
+  std::string m_args;
+  for (size_t i = 1; i < match.size(); ++i)
+  {
+    m_args += match[i];
+    if (i < match.size() - 1)
+      m_args += " ";
+  }
+  return exec(res, macro.name + " " + m_args);
+}
+
+int M8::run_remote(Macro macro, std::string& res, std::smatch const match, macro_fn fn)
+{
+  ++remote_count_;
+
+  Http api;
+  api.req.method = "POST";
+  api.req.headers.emplace_back("content-type: application/json");
+  api.req.url = macro.url;
+
+  Json data;
+  data["name"] = macro.name;
+  data["args"] = match;
+  api.req.data = data.dump();
+
+  std::cout << "Remote macro call -> " << macro.name << "\n";
+  std::future<int> send {std::async(std::launch::async, [&]() {
+    api.run();
+    int status_code = api.res.status;
+    if (status_code != 200)
+    {
+      return -1;
+    }
+    else
+    {
+      res = api.res.body;
+      return 0;
+    }
+  })};
+
+  std::future_status fstatus;
+  do
+  {
+    fstatus = send.wait_for(std::chrono::milliseconds(250));
+    std::cout << "." << std::flush;
+  }
+  while (fstatus != std::future_status::ready);
+
+  int ec = send.get();
+  if (ec == 0)
+    std::cout << "\033[2K\r" << "Success: remote call\n";
+  else
+    std::cout << "\033[2K\r" << "Error: remote call\n";
+
+  return ec;
 }
 
 std::string M8::env_var(std::string const& var) const

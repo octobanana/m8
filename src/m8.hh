@@ -18,8 +18,6 @@ public:
   M8();
   ~M8();
 
-  void set_debug(bool const& val);
-
   // set external macro
   void set_macro(std::string const& name, std::string const& info,
     std::string const& usage, std::string const& regex);
@@ -32,17 +30,16 @@ public:
   void set_macro(std::string const& name, std::string const& info,
     std::string const& usage, std::string const& regex, macro_fn fn);
 
-  void delimit(std::string const& delim_start, std::string const& delim_end);
-
-  std::string list_macros() const;
-
-  std::string macro_info(std::string const& name) const;
-
+  void set_debug(bool const& val);
   void set_config(std::string file_name);
+  void set_delimits(std::string const& delim_start, std::string const& delim_end);
 
   std::string summary() const;
+  std::string list_macros() const;
+  std::string macro_info(std::string const& name) const;
 
   void run(std::string const& ifile, std::string const& ofile);
+  void run_(std::string const& ifile, std::string const& ofile);
 
 private:
   std::ifstream ifile_;
@@ -61,8 +58,11 @@ private:
   bool use_stdout_ {false};
   bool debug_ {false};
 
-  std::string start_ {"#[M8["};
-  std::string end_ {"]]"};
+  std::string delim_start_ {"#[M8["};
+  std::string delim_end_ {"]]"};
+  size_t len_start {delim_start_.length()};
+  size_t len_end {delim_end_.length()};
+  size_t len_total {len_start + len_end};
 
   enum class Mtype
   {
@@ -74,14 +74,18 @@ private:
   struct Macro
   {
     Mtype type;
+    std::string name;
     std::string info;
     std::string usage;
     std::string regex;
     std::string url;
     macro_fn fn;
   }; // struct Macro
-
   std::map<std::string, Macro> macros;
+
+  int run_internal(Macro macro, std::string& res, std::smatch const match, macro_fn fn);
+  int run_external(Macro macro, std::string& res, std::smatch const match, macro_fn fn);
+  int run_remote(Macro macro, std::string& res, std::smatch const match, macro_fn fn);
 
   std::string env_var(std::string const& var) const;
 
