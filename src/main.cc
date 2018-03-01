@@ -131,7 +131,7 @@ int start_m8(Parg& pg)
     m8.run(pg.get("file"), pg.get("output"));
 
     // print out summary
-    std::cerr << m8.summary();
+    // std::cerr << m8.summary();
     return 0;
   }
   catch (std::exception const& e)

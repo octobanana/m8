@@ -3,6 +3,8 @@
 using Parser = OB::Parser;
 #include "sys_command.hh"
 #include "http.hh"
+#include "color.hh"
+namespace Cl = OB::Color;
 
 #include "json.hh"
 using Json = nlohmann::json;
@@ -191,91 +193,53 @@ void M8::run(std::string const& ifile, std::string const& ofile)
   // init the parser obj with the input file
   Parser p {ifile};
 
-  size_t pos_start {0};
-  size_t pos_end {0};
-
   std::string line;
   while(p.get_next(line))
   {
     if (line.empty()) continue;
 
     // debug
-    std::cout << "[debug][m8][run][line] " << line << "\n";
-
-    pos_start = line.find(delim_start_, 0);
-    pos_end = line.find(delim_end_, 0);
-
-    if (pos_start == std::string::npos && pos_end == std::string::npos)
+    std::cout << p.current_line() << ".\n" << line << "\n";
+    std::string mark_line;
+    mark_line.reserve(line.size() + (Cl::fg_black.size() * 2));
+    for (size_t i = 0; i < line.size(); ++i)
     {
-      continue;
+      mark_line += " ";
     }
+    mark_line = Cl::wrap(mark_line, {Cl::fg_green});
 
     // parse line char by char for either start or end delim
     for (size_t i = 0; i < line.size(); ++i)
     {
 
+      // start delimiter
       if (line.at(i) == delim_start_.at(0))
       {
         size_t pos_start = line.find(delim_start_, i);
         if (pos_start != std::string::npos)
         {
           //debug
-          std::cout << "[debug][m8][run][pos_start] " << pos_start << "\n";
-
-          auto t = Tmacro {};
-          t.line_start = p.current_line();
-          t.begin = pos_start;
-          stk.push(t);ne.size(); ++i)
-    {
-
-      if (line.at(i) == delim_start_.at(0))
-      {
-        size_t pos_start = line.find(delim_start_, i);
-        if (pos_start != std::string::npos)
-        {ne.size(); ++i)
-    {
-
-      if (line.at(i) == delim_start_.at(0))
-      {
-        size_t pos_start = line.find(delim_start_, i);
-        if (pos_start != std::string::npos)
-        {
-          //debug
-          std::cout << "[debug][m8][run][pos_start] " << pos_start << "\n";
+          mark_line.replace(pos_start + Cl::fg_black.size(), 1, "^");
 
           auto t = Tmacro {};
           t.line_start = p.current_line();
           t.begin = pos_start;
           stk.push(t);
 
-          i += delim_start_.size();
-
-
-          //debug
-          std::cout << "[debug][m8][run][pos_start] " << pos_start << "\n";
-
-          auto t = Tmacro {};
-          t.line_start = p.current_line();
-          t.begin = pos_start;
-          stk.push(t);
-
-          i += delim_start_.size();
-
-
-
-          i += delim_start_.size();
+          i += delim_start_.size() - 1;
 
           continue;
         }
       }
 
+      // end delimiter
       if (line.at(i) == delim_end_.at(0))
       {
         size_t pos_end = line.find(delim_end_, i);
         if (pos_end != std::string::npos)
         {
           //debug
-          std::cout << "[debug][m8][run][pos_end] " << pos_end << "\n";
+          mark_line.replace(pos_end + Cl::fg_black.size(), 1, "^");
 
           if (stk.empty())
           {
@@ -283,14 +247,24 @@ void M8::run(std::string const& ifile, std::string const& ofile)
           }
           else
           {
-            auto& t = stk.top();
+            auto t = stk.top();
+            stk.pop();
+
             t.line_end = p.current_line();
             t.end = pos_end;
-            ast.emplace_back(t);
-            stk.pop();
+
+            if (stk.empty())
+            {
+              ast.emplace_back(t);
+            }
+            else
+            {
+              auto& l = stk.top();
+              l.children.emplace_back(t);
+            }
           }
 
-          i += delim_end_.size();
+          i += delim_end_.size() - 1;
 
           continue;
         }
@@ -298,19 +272,48 @@ void M8::run(std::string const& ifile, std::string const& ofile)
 
     }
 
+    std::cout << mark_line << "\n\n";
+
   }
 
   // debug
-  for (auto const& e : ast)
+  // print out ast
   {
-    std::stringstream ss; ss
-    << "line     : " << e.line_start << "\n"
-    << "begin    : " << e.begin << "\n"
-    << "line     : " << e.line_end << "\n"
-    << "end      : " << e.end << "\n"
-    << "children : " << e.children.size() << "\n"
-    << "\n";
-    std::cerr << ss.str();
+    std::function<std::string(Tmacro const&, size_t depth)> const print_tmacro = [&](Tmacro const& t, size_t depth) {
+      std::string indent;
+      for (size_t i = 0; i < depth; ++i)
+      {
+        indent += " ";
+      }
+
+      std::stringstream ss; ss
+        << indent << "(\n\n"
+        << indent << "  " << "s-line   : " << t.line_start << "\n"
+        << indent << "  " << "begin    : " << t.begin << "\n"
+        << indent << "  " << "e-line   : " << t.line_end << "\n"
+        << indent << "  " << "end      : " << t.end << "\n";
+      if (t.children.empty())
+      {
+        ss << indent << "  " << "children : 0\n\n";
+      }
+      else
+      {
+        ss << indent << "  " << "children : " << t.children.size() << "\n\n";
+        for (auto const& c : t.children)
+        {
+          ss << print_tmacro(c, depth + 2);
+        }
+      }
+      ss << indent << ")\n\n";
+      return ss.str();
+    };
+
+    std::cout << "(\n\n";
+    for (auto const& e : ast)
+    {
+      std::cout << print_tmacro(e, 2);
+    }
+    std::cout << ")\n";
   }
 
 }

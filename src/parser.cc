@@ -27,10 +27,8 @@ Parser::~Parser()
 
 bool Parser::get_next(std::string& line)
 {
-  // file_.seekg(lines_.at(line_));
   ++line_;
   lines_[line_] = file_.tellg();
-  std::cout << "\n[debug][parser][get_next][line_] " << line_ << "\n";
   bool status {false};
   if (std::getline(file_, line))
   {
@@ -39,7 +37,6 @@ bool Parser::get_next(std::string& line)
   else
   {
     status = false;
-    std::cout << "[debug][parser][get_next] EOF\n";
   }
   return status;
 }
