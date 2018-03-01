@@ -32,6 +32,11 @@ void M8::set_debug(bool const& val)
   debug_ = val;
 }
 
+void M8::set_warnings(bool const& val)
+{
+  warnings_ = val;
+}
+
 void M8::set_macro(std::string const& name, std::string const& info,
   std::string const& usage, std::string const& regex)
 {
@@ -287,7 +292,10 @@ void M8::run(std::string const& ifile, std::string const& ofile)
         {
           // TODO how should undefined macro be treated
           ++warning_count_;
-          std::cout << "Warning: undefined macro '" << name << "'\n";
+          if (warnings_)
+          {
+            std::cout << "Warning: undefined macro '" << name << "'\n";
+          }
           text.replace(pos_start, len, "");
           // text.replace(pos_start, len, "/* " + fn + " */");
           // skip to end of invalid macro
@@ -399,7 +407,10 @@ void M8::run(std::string const& ifile, std::string const& ofile)
         {
           // TODO how should invalid regex be treated
           ++warning_count_;
-          std::cout << "Warning: macro '" << name << "' has invalid regex\n";
+          if (warnings_)
+          {
+            std::cout << "Warning: macro '" << name << "' has invalid regex\n";
+          }
           text.replace(pos_start, len, "");
           // text.replace(pos_start, len, "/* " + fn + " */");
           // skip to end of invalid macro

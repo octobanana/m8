@@ -42,6 +42,8 @@ int program_options(Parg& pg)
 
   // combinable flags
   pg.set("debug,d", "print out debug information, useful for debugging macro regexes");
+  pg.set("warnings,w", "print out any warnings");
+  pg.set("summary", "print out summary");
 
   // singular options
   pg.set("info", "", "str", "view informatin on specific macro");
@@ -93,6 +95,9 @@ int start_m8(Parg& pg)
     // set debug option
     m8.set_debug(pg.get<bool>("debug"));
 
+    // set warnings option
+    m8.set_warnings(pg.get<bool>("warnings"));
+
     // set config file
     m8.set_config(pg.get("config"));
 
@@ -131,7 +136,10 @@ int start_m8(Parg& pg)
     m8.run(pg.get("file"), pg.get("output"));
 
     // print out summary
-    std::cerr << m8.summary();
+    if (pg.get<bool>("summary"))
+    {
+      std::cerr << m8.summary();
+    }
     return 0;
   }
   catch (std::exception const& e)

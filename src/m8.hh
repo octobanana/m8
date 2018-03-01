@@ -19,6 +19,7 @@ public:
   ~M8();
 
   void set_debug(bool const& val);
+  void set_warnings(bool const& val);
 
   // set external macro
   void set_macro(std::string const& name, std::string const& info,
@@ -60,6 +61,7 @@ private:
 
   bool use_stdout_ {false};
   bool debug_ {false};
+  bool warnings_ {false};
 
   std::string start_ {"#[M8["};
   std::string end_ {"]]"};
