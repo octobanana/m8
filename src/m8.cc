@@ -24,6 +24,7 @@ using Json = nlohmann::json;
 #include <future>
 #include <iterator>
 #include <stack>
+#include <cstdlib>
 
 M8::M8()
 {
@@ -182,6 +183,7 @@ void M8::run(std::string const& ifile, std::string const& ofile)
     uint32_t line_end {0};
     size_t begin {0};
     size_t end {0};
+    std::string str;
     std::string name;
     std::string fn;
     std::vector<Tmacro> children;
@@ -221,13 +223,18 @@ void M8::run(std::string const& ifile, std::string const& ofile)
           //debug
           mark_line.replace(pos_start + Cl::fg_black.size(), 1, "^");
 
+          // stack operations
           auto t = Tmacro {};
           t.line_start = p.current_line();
           t.begin = pos_start;
+          if (! stk.empty())
+          {
+            // append placeholder
+            stk.top().str += "[%" + std::to_string(stk.top().children.size()) + "]";
+          }
           stk.push(t);
 
           i += delim_start_.size() - 1;
-
           continue;
         }
       }
@@ -241,6 +248,7 @@ void M8::run(std::string const& ifile, std::string const& ofile)
           //debug
           mark_line.replace(pos_end + Cl::fg_black.size(), 1, "^");
 
+          // stack operations
           if (stk.empty())
           {
             throw std::runtime_error("missing matching delimiter");
@@ -252,6 +260,27 @@ void M8::run(std::string const& ifile, std::string const& ofile)
 
             t.line_end = p.current_line();
             t.end = pos_end;
+
+            // parse str
+            {
+              std::string const symbols {"\n\r\t( "};
+              size_t name_end {t.str.find_first_of(symbols)};
+              if (name_end == std::string::npos)
+              {
+                throw std::runtime_error("invalid macro name");
+              }
+              t.name = t.str.substr(0, name_end);
+              t.fn = t.str.substr(name_end + 1, t.str.size() - 1);
+            }
+
+            // validate name
+            {
+              auto const it = macros.find(t.name);
+              if (it == macros.end())
+              {
+                throw std::runtime_error("undefined macro name");
+              }
+            }
 
             if (stk.empty())
             {
@@ -265,8 +294,23 @@ void M8::run(std::string const& ifile, std::string const& ofile)
           }
 
           i += delim_end_.size() - 1;
-
           continue;
+        }
+      }
+
+      // append inner
+      if (! stk.empty())
+      {
+        auto& t = stk.top();
+
+        if (i == (line.size() - 1))
+        {
+          t.str += line.at(i);
+          t.str += "\n";
+        }
+        else
+        {
+          t.str += line.at(i);
         }
       }
 
@@ -279,39 +323,44 @@ void M8::run(std::string const& ifile, std::string const& ofile)
   // debug
   // print out ast
   {
+    std::system("hr -c magenta -B && echo");
     std::function<std::string(Tmacro const&, size_t depth)> const print_tmacro = [&](Tmacro const& t, size_t depth) {
+      std::string indent_base {Cl::fg_blue + ". " + Cl::reset};
       std::string indent;
       for (size_t i = 0; i < depth; ++i)
       {
-        indent += " ";
+        indent += indent_base;
       }
 
       std::stringstream ss; ss
-        << indent << "(\n\n"
-        << indent << "  " << "s-line   : " << t.line_start << "\n"
-        << indent << "  " << "begin    : " << t.begin << "\n"
-        << indent << "  " << "e-line   : " << t.line_end << "\n"
-        << indent << "  " << "end      : " << t.end << "\n";
+        << indent << "(\n"
+        << indent << indent_base << Cl::fg_magenta << "s-line   : " << Cl::fg_green << t.line_start << "\n" << Cl::reset
+        << indent << indent_base << Cl::fg_magenta << "begin    : " << Cl::fg_green << t.begin << "\n" << Cl::reset
+        << indent << indent_base << Cl::fg_magenta << "e-line   : " << Cl::fg_green << t.line_end << "\n" << Cl::reset
+        << indent << indent_base << Cl::fg_magenta << "end      : " << Cl::fg_green << t.end << "\n" << Cl::reset
+        << indent << indent_base << Cl::fg_magenta << "str      : " << Cl::fg_green << t.str << "\n" << Cl::reset
+        << indent << indent_base << Cl::fg_magenta << "name     : " << Cl::fg_green << t.name << "\n" << Cl::reset
+        << indent << indent_base << Cl::fg_magenta << "args     : " << Cl::fg_green << t.fn << "\n" << Cl::reset;
       if (t.children.empty())
       {
-        ss << indent << "  " << "children : 0\n\n";
+        ss << indent << indent_base << Cl::fg_magenta << "children : " << Cl::fg_green << "0\n" << Cl::reset;
       }
       else
       {
-        ss << indent << "  " << "children : " << t.children.size() << "\n\n";
+        ss << indent << indent_base << Cl::fg_magenta << "children : " << Cl::fg_green << t.children.size() << "\n" << Cl::reset;
         for (auto const& c : t.children)
         {
-          ss << print_tmacro(c, depth + 2);
+          ss << print_tmacro(c, depth + 1);
         }
       }
-      ss << indent << ")\n\n";
+      ss << indent << ")\n";
       return ss.str();
     };
 
-    std::cout << "(\n\n";
+    std::cout << "(\n";
     for (auto const& e : ast)
     {
-      std::cout << print_tmacro(e, 2);
+      std::cout << print_tmacro(e, 1);
     }
     std::cout << ")\n";
   }

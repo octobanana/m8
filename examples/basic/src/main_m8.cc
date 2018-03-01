@@ -7,8 +7,6 @@
 
 #[M8[add std::string]]
 
-#[M8[oops 64]]
-
 #[M8[main (
 
   auto cat1 = add(5, 6);
