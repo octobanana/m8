@@ -1,6 +1,10 @@
 #ifndef OB_M8_HH
 #define OB_M8_HH
 
+#include "ast.hh"
+using Tmacro = OB::Tmacro;
+using Ast = OB::Ast;
+
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -38,7 +42,9 @@ public:
   std::string list_macros() const;
   std::string macro_info(std::string const& name) const;
 
-  void run(std::string const& ifile, std::string const& ofile);
+  void parse(std::string const& ifile);
+  void run();
+
   void run_(std::string const& ifile, std::string const& ofile);
 
 private:
@@ -82,6 +88,8 @@ private:
     macro_fn fn;
   }; // struct Macro
   std::map<std::string, Macro> macros;
+
+  Ast ast_;
 
   int run_internal(Macro macro, std::string& res, std::smatch const match, macro_fn fn);
   int run_external(Macro macro, std::string& res, std::smatch const match, macro_fn fn);

@@ -29,6 +29,7 @@ include_directories(
 set (SOURCES
   src/main.cc
   src/m8.cc
+  src/ast.cc
   src/parser.cc
   src/macros.cc
   src/sys_command.cc

@@ -1,4 +1,7 @@
 #include "m8.hh"
+#include "ast.hh"
+using Tmacro = OB::Tmacro;
+using Ast = OB::Ast;
 #include "parser.hh"
 using Parser = OB::Parser;
 #include "sys_command.hh"
@@ -24,7 +27,6 @@ using Json = nlohmann::json;
 #include <future>
 #include <iterator>
 #include <stack>
-#include <cstdlib>
 
 M8::M8()
 {
@@ -175,24 +177,14 @@ std::string M8::summary() const
   return ss.str();
 }
 
-void M8::run(std::string const& ifile, std::string const& ofile)
+void M8::parse(std::string const& ifile)
 {
-  struct Tmacro
-  {
-    uint32_t line_start {0};
-    uint32_t line_end {0};
-    size_t begin {0};
-    size_t end {0};
-    std::string str;
-    std::string name;
-    std::string fn;
-    std::vector<Tmacro> children;
-    std::string res;
-  };
-  std::vector<Tmacro> ast;
+  auto& ast = ast_.ast;
+
+  // init the parsing stack
   std::stack<Tmacro> stk;
 
-  // init the parser obj with the input file
+  // init the parser with the input file
   Parser p {ifile};
 
   std::string line;
@@ -224,7 +216,7 @@ void M8::run(std::string const& ifile, std::string const& ofile)
           mark_line.replace(pos_start + Cl::fg_black.size(), 1, "^");
 
           // stack operations
-          auto t = Tmacro {};
+          auto t = Tmacro();
           t.line_start = p.current_line();
           t.begin = pos_start;
           if (! stk.empty())
@@ -251,7 +243,7 @@ void M8::run(std::string const& ifile, std::string const& ofile)
           // stack operations
           if (stk.empty())
           {
-            throw std::runtime_error("missing matching delimiter");
+            throw std::runtime_error("missing opening delimiter");
           }
           else
           {
@@ -261,24 +253,67 @@ void M8::run(std::string const& ifile, std::string const& ofile)
             t.line_end = p.current_line();
             t.end = pos_end;
 
-            // parse str
+            // parse str into name and args
             {
-              std::string const symbols {"\n\r\t( "};
+              std::string const symbols {"\n "};
               size_t name_end {t.str.find_first_of(symbols)};
               if (name_end == std::string::npos)
               {
-                throw std::runtime_error("invalid macro name");
+                throw std::runtime_error("invalid name");
               }
+
               t.name = t.str.substr(0, name_end);
-              t.fn = t.str.substr(name_end + 1, t.str.size() - 1);
+              t.args = t.str.substr(name_end + 1, t.str.size() - 1);
             }
 
-            // validate name
+            // validate name and args
             {
               auto const it = macros.find(t.name);
               if (it == macros.end())
               {
-                throw std::runtime_error("undefined macro name");
+                std::cout << Cl::fg_red << "Undefined name: " << Cl::reset;
+                std::cout << ifile << ":"
+                  << t.line_start << ":" <<
+                  (t.begin + delim_start_.size() + 1) << "\n";
+                std::cout << Cl::fg_magenta << "macro: " << Cl::fg_green << t.str << "\n";
+                std::cout << Cl::fg_magenta << "       ^" << Cl::reset << "\n";
+
+                // lookup similar macro suggestion
+                {
+                  std::cout << Cl::fg_magenta << "Did you mean: " << Cl::fg_green;
+                  std::regex similar_regex {".+?[" + t.name + "]{" + std::to_string(int(t.name.size() / 1.4)) + "}.+?"};
+                  std::smatch similar_match;
+                  for (auto const& e : macros)
+                  {
+                    if (std::regex_match(e.first, similar_match, similar_regex))
+                    {
+                      std::cout << similar_match[0] << " ";
+                    }
+                  }
+                  std::cout << "\n" << Cl::reset;
+                }
+
+                throw std::runtime_error("undefined name");
+              }
+              std::smatch match;
+              if (std::regex_match(t.args, match, std::regex(it->second.regex)))
+              {
+                for (auto const& e : match)
+                {
+                  t.match.emplace_back(std::string(e));
+                }
+
+                // process macro
+              }
+              else
+              {
+                std::cout << Cl::fg_red << "Invalid regex: " << Cl::reset;
+                std::cout << ifile << ":"
+                  << t.line_start << ":" <<
+                  (t.begin + delim_start_.size() + 1) << "\n";
+                std::cout << Cl::fg_magenta << "macro: " << Cl::fg_green << t.str << "\n";
+                std::cout << Cl::fg_magenta << "regex: " << Cl::fg_green << it->second.regex << "\n" << Cl::reset;
+                throw std::runtime_error("invalid regex");
               }
             }
 
@@ -320,51 +355,28 @@ void M8::run(std::string const& ifile, std::string const& ofile)
 
   }
 
-  // debug
-  // print out ast
+  if (! stk.empty())
   {
-    std::system("hr -c magenta -B && echo");
-    std::function<std::string(Tmacro const&, size_t depth)> const print_tmacro = [&](Tmacro const& t, size_t depth) {
-      std::string indent_base {Cl::fg_blue + ". " + Cl::reset};
-      std::string indent;
-      for (size_t i = 0; i < depth; ++i)
-      {
-        indent += indent_base;
-      }
-
-      std::stringstream ss; ss
-        << indent << "(\n"
-        << indent << indent_base << Cl::fg_magenta << "s-line   : " << Cl::fg_green << t.line_start << "\n" << Cl::reset
-        << indent << indent_base << Cl::fg_magenta << "begin    : " << Cl::fg_green << t.begin << "\n" << Cl::reset
-        << indent << indent_base << Cl::fg_magenta << "e-line   : " << Cl::fg_green << t.line_end << "\n" << Cl::reset
-        << indent << indent_base << Cl::fg_magenta << "end      : " << Cl::fg_green << t.end << "\n" << Cl::reset
-        << indent << indent_base << Cl::fg_magenta << "str      : " << Cl::fg_green << t.str << "\n" << Cl::reset
-        << indent << indent_base << Cl::fg_magenta << "name     : " << Cl::fg_green << t.name << "\n" << Cl::reset
-        << indent << indent_base << Cl::fg_magenta << "args     : " << Cl::fg_green << t.fn << "\n" << Cl::reset;
-      if (t.children.empty())
-      {
-        ss << indent << indent_base << Cl::fg_magenta << "children : " << Cl::fg_green << "0\n" << Cl::reset;
-      }
-      else
-      {
-        ss << indent << indent_base << Cl::fg_magenta << "children : " << Cl::fg_green << t.children.size() << "\n" << Cl::reset;
-        for (auto const& c : t.children)
-        {
-          ss << print_tmacro(c, depth + 1);
-        }
-      }
-      ss << indent << ")\n";
-      return ss.str();
-    };
-
-    std::cout << "(\n";
-    for (auto const& e : ast)
-    {
-      std::cout << print_tmacro(e, 1);
-    }
-    std::cout << ")\n";
+    throw std::runtime_error("missing closing delimiter");
   }
 
+  // debug
+  // print out ast
+  std::cerr << ast_.str() << std::endl;
+}
+
+void M8::run()
+{
+  // validate and process macros
+  auto& ast = ast_.ast;
+  std::stack<Tmacro> stk;
+
+  for (auto& e : ast)
+  {
+    if (e.children.empty())
+    {
+    }
+  }
 }
 
 void M8::run_(std::string const& ifile, std::string const& ofile)

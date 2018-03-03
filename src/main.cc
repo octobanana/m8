@@ -127,8 +127,11 @@ int start_m8(Parg& pg)
       return 1;
     }
 
+    // parse
+    m8.parse(pg.get("file"));
+
     // run m8
-    m8.run(pg.get("file"), pg.get("output"));
+    // m8.run(pg.get("file"), pg.get("output"));
 
     // print out summary
     // std::cerr << m8.summary();
