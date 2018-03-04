@@ -16,11 +16,15 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <cctype>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 namespace Macros
 {
 // prototypes
 std::string repeat(std::string val, int num);
+void replace_all(std::string& str, std::string const& key, std::string const& val);
+std::vector<std::string> delimit(std::string const& str, std::string const& delim);
 
 // helper functions
 std::string repeat(std::string val, int num)
@@ -35,6 +39,36 @@ std::string repeat(std::string val, int num)
     out.append(val);
   }
   return out;
+}
+
+void replace_all(std::string& str, std::string const& key, std::string const& val)
+{
+  std::string::size_type pos_start = 0;
+  size_t len_key {key.length()};
+
+  do
+  {
+    pos_start = str.find(key, ++pos_start);
+    if (pos_start != std::string::npos)
+    {
+      str.replace(pos_start, len_key, val);
+    }
+  }
+  while (pos_start != std::string::npos);
+}
+
+std::vector<std::string> delimit(std::string const& str, std::string const& delim)
+{
+  std::vector<std::string> vtok;
+  auto start = 0U;
+  auto end = str.find(delim);
+  while (end != std::string::npos) {
+    vtok.emplace_back(str.substr(start, end - start));
+    start = end + delim.length();
+    end = str.find(delim, start);
+  }
+  vtok.emplace_back(str.substr(start, end));
+  return vtok;
 }
 
 // macro functions
@@ -159,7 +193,8 @@ auto const fn_file = [](auto& s, auto const& m) {
 };
 
 auto const fn_env = [](auto& s, auto const& m) {
-  s = std::getenv(std::string(m[1]).c_str());
+  std::string str {std::getenv(std::string(m[1]).c_str())};
+  s = str;
   return 0;
 };
 
@@ -232,11 +267,173 @@ auto const fn_sourcepp = [](auto& s, auto const& m) {
   return 0;
 };
 
+auto const fn_str = [](auto& s, auto const& m) {
+  auto str {std::string(m[1])};
+  s = "\"" + str + "\"";
+  return 0;
+};
+
+auto const fn_prt = [](auto& s, auto const& m) {
+  auto str {std::string(m[1])};
+  replace_all(str, "\\n", "\n");
+  std::cout << str << std::flush;
+  return 0;
+};
+
+auto const fn_print = [](auto& s, auto const& m) {
+  auto str {std::string(m[1])};
+  replace_all(str, "\\n", "\n");
+
+  std::stringstream ss;
+
+  std::regex r {"\"([^\\r]+?)\""};
+  std::smatch sm;
+  while(regex_search(str, sm, r))
+  {
+    ss << sm[1];
+    str = sm.suffix();
+  }
+  std::cout << ss.str() << std::flush;
+  return 0;
+};
+
+auto const fn_nl = [](auto& s, auto const& m) {
+  std::cout << "\n" << std::flush;
+  return 0;
+};
+
+auto const fn_math_add = [](auto& s, auto const& m) {
+  auto n1 {std::string(m[1])};
+  auto n2 {std::string(m[2])};
+  double total {std::stod(n1) + std::stod(n2)};
+  std::stringstream ss; ss << total;
+  s = ss.str();
+  return 0;
+};
+
+auto const fn_math_subtract = [](auto& s, auto const& m) {
+  auto n1 {std::string(m[1])};
+  auto n2 {std::string(m[2])};
+  double total {std::stod(n1) - std::stod(n2)};
+  std::stringstream ss; ss << total;
+  s = ss.str();
+  return 0;
+};
+
+auto const fn_math_multiply = [](auto& s, auto const& m) {
+  auto n1 {std::string(m[1])};
+  auto n2 {std::string(m[2])};
+  double total {std::stod(n1) * std::stod(n2)};
+  std::stringstream ss; ss << total;
+  s = ss.str();
+  return 0;
+};
+
+auto const fn_math_divide = [](auto& s, auto const& m) {
+  auto n1 {std::string(m[1])};
+  auto n2 {std::string(m[2])};
+  double total {std::stod(n1) / std::stod(n2)};
+  std::stringstream ss; ss << total;
+  s = ss.str();
+  return 0;
+};
+
+auto const fn_cat = [](auto& s, auto const& m) {
+  std::string str {std::string(m[1])};
+  std::stringstream ss;
+
+  std::regex r {"\"([^//r]+?)\""};
+  std::smatch sm;
+  while(regex_search(str, sm, r))
+  {
+    ss << sm[1];
+    str = sm.suffix();
+  }
+  s = "\"" + ss.str() + "\"";
+
+  return 0;
+};
+
+auto const fn_stringify = [](auto& s, auto const& m) {
+  auto str {std::string(m[1])};
+  std::stringstream ss; ss
+  << "(str " << str << ")";
+  s = ss.str();
+  return 0;
+};
+
+auto const fn_term_width = [](auto& s, auto const& m) {
+  struct winsize w;
+  ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+  int width = w.ws_col;
+  s = std::to_string(width);
+  return 0;
+};
+
 // define macros
 // M8::set_macro(name, info, usage, regex, func)
 
 void macros(M8& m8)
 {
+  m8.set_macro("stringify",
+    "returns str macro",
+    "stringify arg",
+    "^(.+)$",
+    fn_stringify);
+  m8.set_macro("/",
+    "divide two values",
+    "/ n1 n2",
+    "^([0-9]+)\\s+([0-9]+)$",
+    fn_math_divide);
+
+  m8.set_macro("*",
+    "multiply two values",
+    "* n1 n2",
+    "^([0-9]+)\\s+([0-9]+)$",
+    fn_math_multiply);
+
+  m8.set_macro("-",
+    "subtract two values",
+    "- n1 n2",
+    "^([0-9]+)\\s+([0-9]+)$",
+    fn_math_subtract);
+
+  m8.set_macro("+",
+    "add two values",
+    "+ n1 n2",
+    "^([0-9]+)\\s+([0-9]+)$",
+    fn_math_add);
+
+  m8.set_macro("nl!",
+    "print a newline to stdout",
+    "!nl",
+    "",
+    fn_nl);
+
+  m8.set_macro("print!",
+    "print a string to stdout",
+    "print! str",
+    "^([^\\r]+?)$",
+    fn_print);
+
+  m8.set_macro("term-width",
+    "returns width of terminal",
+    "term-width",
+    "",
+    fn_term_width);
+
+  m8.set_macro("prt!",
+    "print raw to stdout",
+    "prt! str",
+    "^([^\\r]+?)$",
+    fn_prt);
+
+  m8.set_macro("str",
+    "wrap argument in double quotes",
+    "str arg",
+    "^([^\\r]+)$",
+    fn_str);
+
   m8.set_macro("sourcepp",
     "templates a c++ source file structure",
     "sourcepp str",
@@ -281,8 +478,8 @@ void macros(M8& m8)
 
   m8.set_macro("repeat",
     "repeats the given input by n",
-    "repeat (str EOF, int)",
-    "^\\(([^>]+?) EOF, ([0-9]+?)\\)$",
+    "repeat [str EOF, int]",
+    "^\\[([^\\r]+?) EOF, ([0-9]+?)\\]$",
     fn_repeat);
 
   m8.set_macro("add",

@@ -43,13 +43,13 @@ public:
   std::string macro_info(std::string const& name) const;
 
   void parse(std::string const& ifile);
-  void run();
+  void write(std::string const& _ifile, std::string const& _ofile);
 
-  void run_(std::string const& ifile, std::string const& ofile);
+  // void run_(std::string const& ifile, std::string const& ofile);
 
 private:
-  std::ifstream ifile_;
-  std::ofstream ofile_;
+  // std::ifstream ifile_;
+  // std::ofstream ofile_;
 
   // general stats
   int macro_count_ {0};
@@ -64,8 +64,8 @@ private:
   bool use_stdout_ {false};
   bool debug_ {false};
 
-  std::string delim_start_ {"#[M8["};
-  std::string delim_end_ {"]]"};
+  std::string delim_start_ {"[M8["};
+  std::string delim_end_ {"]8M]"};
   size_t len_start {delim_start_.length()};
   size_t len_end {delim_end_.length()};
   size_t len_total {len_start + len_end};
@@ -96,6 +96,7 @@ private:
   int run_remote(Macro macro, std::string& res, std::smatch const match, macro_fn fn);
 
   std::string env_var(std::string const& var) const;
+  std::vector<std::string> suggest_macro(std::string const& name) const;
 
 }; // class M8
 
