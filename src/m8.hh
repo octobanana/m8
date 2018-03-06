@@ -42,15 +42,11 @@ public:
   std::string list_macros() const;
   std::string macro_info(std::string const& name) const;
 
-  void parse(std::string const& ifile);
-  void write(std::string const& _ifile, std::string const& _ofile);
+  void parse(std::string const& _ifile, std::string const& _ofile);
 
   // void run_(std::string const& ifile, std::string const& ofile);
 
 private:
-  // std::ifstream ifile_;
-  // std::ofstream ofile_;
-
   // general stats
   int macro_count_ {0};
   int warning_count_ {0};
@@ -89,6 +85,7 @@ private:
   }; // struct Macro
   std::map<std::string, Macro> macros;
 
+  // abstract syntax tree
   Ast ast_;
 
   int run_internal(Macro macro, std::string& res, std::smatch const match, macro_fn fn);

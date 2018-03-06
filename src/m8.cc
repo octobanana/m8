@@ -222,41 +222,54 @@ std::vector<std::string> M8::suggest_macro(std::string const& name) const
   return similar_names;
 }
 
-void M8::write(std::string const& _ifile, std::string const& _ofile)
-{
-  std::ifstream ifile {_ifile};
-  if (! ifile.is_open())
-  {
-    throw std::runtime_error("could not open input file");
-  }
-
-  std::ifstream ofile {_ofile};
-  if (! ofile.is_open())
-  {
-    throw std::runtime_error("could not open output file");
-  }
-
-  auto& ast = ast_.ast;
-
-  for (auto const& e : ast)
-  {
-  }
-}
-
-void M8::parse(std::string const& ifile)
+void M8::parse(std::string const& _ifile, std::string const& _ofile)
 {
   auto& ast = ast_.ast;
 
   // init the parsing stack
   std::stack<Tmacro> stk;
 
+  // TODO change to reader class name
   // init the parser with the input file
-  Parser p {ifile};
+  Parser p {_ifile};
+
+  // TODO make this a writer class
+  // open the output file
+  std::ofstream ofile;
+  if (! _ofile.empty())
+  {
+    ofile.open(_ofile);
+    if (! ofile.is_open())
+    {
+      throw std::runtime_error("could not open output file");
+    }
+  }
 
   std::string line;
   while(p.get_next(line))
   {
-    if (line.empty()) continue;
+
+    // check for empty line
+    if (line.empty())
+    {
+      if (stk.empty())
+      {
+        if (! _ofile.empty())
+        {
+          ofile << "\n";
+        }
+        continue;
+      }
+      else
+      {
+        auto& t = stk.top();
+        t.str += "\n";
+        continue;
+      }
+    }
+
+    // buffer to hold external chars
+    std::string buf;
 
     // debug
     // std::cout << p.current_line() << ".\n" << line << "\n";
@@ -273,8 +286,10 @@ void M8::parse(std::string const& ifile)
     {
 
       // check for comment ';'
-      if (line.at(i) == ';')
+      if ((line.at(i) == ';') && stk.empty())
       {
+        buf += line.substr(i, line.size() - i);
+        buf += "\n";
         break;
       }
 
@@ -328,7 +343,7 @@ void M8::parse(std::string const& ifile)
             // parse str into name and args
             {
               std::smatch match;
-              std::string name_args {"^\\s*([a-zA-Z./*\\-+!?]+)\\s*([^\\r]*?)\\s*$"};
+              std::string name_args {"^\\s*([a-zA-Z0-9./*\\-+!?]+)\\s*([^\\r]*?)\\s*$"};
               if (std::regex_match(t.str, match, std::regex(name_args)))
               {
                 t.name = match[1];
@@ -348,11 +363,10 @@ void M8::parse(std::string const& ifile)
               if (it == macros.end())
               {
                 std::cout << Cl::fg_red << "Undefined name: " << Cl::reset;
-                std::cout << ifile << ":"
+                std::cout << _ifile << ":"
                   << t.line_start << ":" <<
                   (t.begin + delim_start_.size() + 1) << "\n";
-                std::cout << Cl::fg_magenta << "macro: " << Cl::fg_green << t.str << "\n";
-                std::cout << Cl::fg_magenta << "       ^" << Cl::reset << "\n";
+                std::cout << Cl::fg_magenta << "macro: " << Cl::fg_green << t.name << "\n";
 
                 // lookup similar macro suggestion
                 {
@@ -410,29 +424,33 @@ void M8::parse(std::string const& ifile)
                 {
                   stk.top().str += t.res;
                 }
+                else
+                {
+                  buf += t.res;
+                }
 
               }
               else
               {
                 std::cout << Cl::fg_red << "Invalid regex: " << Cl::reset;
-                std::cout << ifile << ":"
+                std::cout << _ifile << ":"
                   << t.line_start << ":" <<
                   (t.begin + delim_start_.size() + 1) << "\n";
-                std::cout << Cl::fg_magenta << "macro: " << Cl::fg_green << t.str << "\n";
+                std::cout << Cl::fg_magenta << "macro: " << Cl::fg_green << t.name << t.args << "\n";
                 std::cout << Cl::fg_magenta << "regex: " << Cl::fg_green << it->second.regex << "\n" << Cl::reset;
                 throw std::runtime_error("invalid regex");
               }
             }
 
-            if (stk.empty())
-            {
-              ast.emplace_back(t);
-            }
-            else
-            {
-              auto& l = stk.top();
-              l.children.emplace_back(t);
-            }
+            // if (stk.empty())
+            // {
+            //   ast.emplace_back(t);
+            // }
+            // else
+            // {
+            //   auto& l = stk.top();
+            //   l.children.emplace_back(t);
+            // }
           }
 
           i += delim_end_.size() - 1;
@@ -455,7 +473,26 @@ void M8::parse(std::string const& ifile)
           t.str += line.at(i);
         }
       }
+      else
+      {
+        if (i == (line.size() - 1))
+        {
+          buf += line.at(i);
+          buf += "\n";
+        }
+        else
+        {
+          buf += line.at(i);
+        }
+      }
 
+    }
+
+    // append buf to output file
+    if (! _ofile.empty())
+    {
+      ofile << buf;
+      ofile.flush();
     }
 
     // debug
