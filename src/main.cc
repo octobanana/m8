@@ -5,20 +5,16 @@
 using Parg = OB::Parg;
 
 #include <string>
-#include <sstream>
 #include <iostream>
-#include <fstream>
-#include <map>
-#include <vector>
-#include <regex>
-#include <functional>
+#include <algorithm>
 
 int program_options(Parg& pg);
+void replace_all(std::string& str, std::string const& key, std::string const& val);
 int start_m8(Parg& pg);
 
 int program_options(Parg& pg)
 {
-  pg.name("m8").version("0.2.1 (26.02.2018)");
+  pg.name("m8").version("0.4.0 (29.03.2018)");
   pg.description("a meta programming tool");
   pg.usage("[flags] [options] [--] [arguments]");
   pg.usage("[-f 'input_file'] [-o 'output_file'] [-c 'config file'] [-s 'start_delim'] [-e 'end_delim'] [d]");
@@ -42,6 +38,8 @@ int program_options(Parg& pg)
 
   // combinable flags
   pg.set("debug,d", "print out debug information, useful for debugging macro regexes");
+  pg.set("interpreter,i", "start the interpreter in readline mode");
+  pg.set("no-copy", "do not copy outside text");
 
   // singular options
   pg.set("info", "", "str", "view informatin on specific macro");
@@ -52,6 +50,7 @@ int program_options(Parg& pg)
   pg.set("output,o", "", "file_name", "the output file");
   pg.set("start,s", "", "str", "the starting delimiter");
   pg.set("end,e", "", "str", "the ending delimiter");
+  pg.set("mirror,m", "", "str", "mirror the delimiter");
 
   // pg.set_pos();
   // pg.set_stdin();
@@ -83,24 +82,25 @@ int program_options(Parg& pg)
   return 0;
 }
 
+void replace_all(std::string& str, std::string const& key, std::string const& val)
+{
+  size_t pos {0};
+
+  for (;;)
+  {
+    pos = str.find(key, pos);
+    if (pos == std::string::npos) break;
+    str.replace(pos, key.size(), val);
+    ++pos;
+  }
+}
+
 int start_m8(Parg& pg)
 {
   try
   {
     // init M8 object
     M8 m8;
-
-    // set debug option
-    m8.set_debug(pg.get<bool>("debug"));
-
-    // set config file
-    m8.set_config(pg.get("config"));
-
-    // set start and end delimiters
-    if (pg.find("start") && pg.find("end"))
-    {
-      m8.set_delimits(pg.get("start"), pg.get("end"));
-    }
 
     // add internal macros
     Macros::macros(m8);
@@ -119,12 +119,33 @@ int start_m8(Parg& pg)
       return 0;
     }
 
-    // check to see if ifile and ofile args were given
-    // if (! pg.find("file") || ! pg.find("output"))
-    if (! pg.find("file"))
+    // set debug option
+    m8.set_debug(pg.get<bool>("debug"));
+
+    // set readline option
+    m8.set_readline(pg.get<bool>("interpreter"));
+
+    // set config file
+    m8.set_config(pg.get("config"));
+
+    // set no-copy option
+    m8.set_copy(! pg.get<bool>("no-copy"));
+
+    // set start and end delimiters
+    if (pg.find("mirror"))
     {
-      std::cout << "Error: missing required 'file' argument\n";
-      return 1;
+      auto delim = pg.get<std::string>("mirror");
+      auto rdelim = delim;
+      std::reverse(std::begin(rdelim), std::end(rdelim));
+      replace_all(rdelim, "(", ")");
+      replace_all(rdelim, "[", "]");
+      replace_all(rdelim, "{", "}");
+      replace_all(rdelim, "<", ">");
+      m8.set_delimits(delim, rdelim);
+    }
+    else if (pg.find("start") && pg.find("end"))
+    {
+      m8.set_delimits(pg.get("start"), pg.get("end"));
     }
 
     // parse
@@ -137,7 +158,7 @@ int start_m8(Parg& pg)
   catch (std::exception const& e)
   {
     std::cerr << "Error: " << e.what() << "\n";
-    return -1;
+    return 1;
   }
 }
 

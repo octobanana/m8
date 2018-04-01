@@ -52,21 +52,21 @@ std::string Ast::recurse_tmacro(Tmacro const& t, size_t depth)
   << indent << indent_base << Cl::fg_magenta << "name     : " << Cl::fg_green << t.name << "\n" << Cl::reset
   << indent << indent_base << Cl::fg_magenta << "args     : " << Cl::fg_green << t.args << "\n" << Cl::reset;
 
-  // ss << indent << indent_base << Cl::fg_magenta << "match    : " << Cl::fg_green;
+  ss << indent << indent_base << Cl::fg_magenta << "match    : " << Cl::fg_green;
 
-  // if (t.match.size() > 1)
-  // {
-  //   for (size_t i = 0; i < t.match.size() - 1; ++i)
-  //   {
-  //     ss << "[" << t.match.at(i) << "]" << Cl::fg_magenta << ", " << Cl::fg_green;
-  //   }
-  //   ss << "[" << t.match.back() << "]";
-  // }
-  // else if (t.match.size() == 1)
-  // {
-  //   ss << "[" << t.match.back() << "]";
-  // }
-  // ss << "\n" << Cl::reset;
+  if (t.match.size() > 1)
+  {
+    for (size_t i = 0; i < t.match.size() - 1; ++i)
+    {
+      ss << "[" << t.match.at(i) << "]" << Cl::fg_magenta << ", " << Cl::fg_green;
+    }
+    ss << "[" << t.match.back() << "]";
+  }
+  else if (t.match.size() == 1)
+  {
+    ss << "[" << t.match.back() << "]";
+  }
+  ss << "\n" << Cl::reset;
 
   if (t.children.empty())
   {

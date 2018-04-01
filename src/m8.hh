@@ -5,6 +5,9 @@
 using Tmacro = OB::Tmacro;
 using Ast = OB::Ast;
 
+#include "cache.hh"
+using Cache = OB::Cache;
+
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -13,14 +16,25 @@ using Ast = OB::Ast;
 #include <vector>
 #include <regex>
 #include <functional>
+#include <utility>
 
 class M8
 {
-  using macro_fn = std::function<int(std::string&, std::smatch const&)>;
-
 public:
   M8();
   ~M8();
+
+  using Args = std::vector<std::string>;
+
+  struct Ctx
+  {
+    std::string& str;
+    Args const& args;
+    Cache& cache;
+  }; // struct Ctx
+
+  using macro_fn = std::function<int(Ctx& ctx)>;
+  // using macro_fn = std::function<int(std::string&, Args const&)>;
 
   // set external macro
   void set_macro(std::string const& name, std::string const& info,
@@ -34,17 +48,17 @@ public:
   void set_macro(std::string const& name, std::string const& info,
     std::string const& usage, std::string const& regex, macro_fn fn);
 
-  void set_debug(bool const& val);
+  void set_debug(bool val);
+  void set_copy(bool val);
   void set_config(std::string file_name);
   void set_delimits(std::string const& delim_start, std::string const& delim_end);
+  void set_readline(bool val);
 
   std::string summary() const;
   std::string list_macros() const;
   std::string macro_info(std::string const& name) const;
 
   void parse(std::string const& _ifile, std::string const& _ofile);
-
-  // void run_(std::string const& ifile, std::string const& ofile);
 
 private:
   // general stats
@@ -57,8 +71,10 @@ private:
   int external_count_ {0};
   int remote_count_ {0};
 
+  bool readline_ {false};
   bool use_stdout_ {false};
   bool debug_ {false};
+  bool copy_ {false};
 
   std::string delim_start_ {"[M8["};
   std::string delim_end_ {"]8M]"};
@@ -81,16 +97,16 @@ private:
     std::string usage;
     std::string regex;
     std::string url;
-    macro_fn fn;
+    macro_fn func;
   }; // struct Macro
   std::map<std::string, Macro> macros;
 
   // abstract syntax tree
   Ast ast_;
 
-  int run_internal(Macro macro, std::string& res, std::smatch const match, macro_fn fn);
-  int run_external(Macro macro, std::string& res, std::smatch const match, macro_fn fn);
-  int run_remote(Macro macro, std::string& res, std::smatch const match, macro_fn fn);
+  int run_internal(Macro const& macro, Ctx& ctx);
+  int run_external(Macro const& macro, Ctx& ctx);
+  int run_remote(Macro const& macro, Ctx& ctx);
 
   std::string env_var(std::string const& var) const;
   std::vector<std::string> suggest_macro(std::string const& name) const;

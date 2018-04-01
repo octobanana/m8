@@ -1,4 +1,4 @@
-#include "parser.hh"
+#include "lexer.hh"
 
 #include <string>
 #include <sstream>
@@ -7,11 +7,11 @@
 namespace OB
 {
 
-Parser::Parser()
+Lexer::Lexer()
 {
 }
 
-Parser::~Parser()
+Lexer::~Lexer()
 {
 }
 

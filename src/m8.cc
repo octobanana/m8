@@ -1,13 +1,33 @@
 #include "m8.hh"
+
 #include "ast.hh"
 using Tmacro = OB::Tmacro;
 using Ast = OB::Ast;
+
+#include "reader.hh"
+using Reader = OB::Reader;
+
+#include "writer.hh"
+using Writer = OB::Writer;
+
+#include "lexer.hh"
+using Lexer = OB::Lexer;
+
 #include "parser.hh"
 using Parser = OB::Parser;
+
+#include "cache.hh"
+using Cache = OB::Cache;
+
 #include "sys_command.hh"
+#include "crypto.hh"
 #include "http.hh"
+
 #include "color.hh"
 namespace Cl = OB::Color;
+
+#include "ansi_escape_codes.hh"
+namespace AEC = OB::ANSI_Escape_Codes;
 
 #include "json.hh"
 using Json = nlohmann::json;
@@ -36,38 +56,48 @@ M8::~M8()
 {
 }
 
-void M8::set_debug(bool const& val)
+void M8::set_debug(bool val)
 {
   debug_ = val;
+}
+
+void M8::set_copy(bool val)
+{
+  copy_ = val;
+}
+
+void M8::set_readline(bool val)
+{
+  readline_ = val;
 }
 
 void M8::set_macro(std::string const& name, std::string const& info,
   std::string const& usage, std::string const& regex)
 {
-  if (macros.find(name) != macros.end())
-  {
-    throw std::logic_error("multiple definitions of macro: " + name);
-  }
+  // if (macros.find(name) != macros.end())
+  // {
+  //   throw std::logic_error("multiple definitions of macro: " + name);
+  // }
   macros[name] = {Mtype::external, name, info, usage, regex, "", nullptr};
 }
 
 void M8::set_macro(std::string const& name, std::string const& info,
   std::string const& usage, std::string const& regex, std::string const& url)
 {
-  if (macros.find(name) != macros.end())
-  {
-    throw std::logic_error("multiple definitions of macro: " + name);
-  }
+  // if (macros.find(name) != macros.end())
+  // {
+  //   throw std::logic_error("multiple definitions of macro: " + name);
+  // }
   macros[name] = {Mtype::remote, name, info, usage, regex, url, nullptr};
 }
 
 void M8::set_macro(std::string const& name, std::string const& info,
   std::string const& usage, std::string const& regex, macro_fn fn)
 {
-  if (macros.find(name) != macros.end())
-  {
-    throw std::logic_error("multiple definitions of macro: " + name);
-  }
+  // if (macros.find(name) != macros.end())
+  // {
+  //   throw std::logic_error("multiple definitions of macro: " + name);
+  // }
   macros[name] = {Mtype::internal, name, info, usage, regex, "", fn};
 }
 
@@ -148,17 +178,18 @@ void M8::set_config(std::string file_name)
     {
       std::cerr << "Debug: could not open config file\n";
     }
-    // return with no error if external macros do not matter
-    // or throw exception if config file is mandatory
-
-    // throw std::runtime_error("could not open the config file");
     return;
   }
 
   // read in the config file into memory
-  std::string content;
-  content.assign((std::istreambuf_iterator<char>(file)),
-      (std::istreambuf_iterator<char>()));
+  // std::string content;
+  // content.assign((std::istreambuf_iterator<char>(file)),
+  //     (std::istreambuf_iterator<char>()));
+  file.seekg(0, std::ios::end);
+  size_t size (file.tellg());
+  std::string content (size, ' ');
+  file.seekg(0);
+  file.read(&content[0], size);
 
   // parse the contents
   Json j = Json::parse(content);
@@ -185,7 +216,6 @@ void M8::set_config(std::string file_name)
         e["regex"].get<std::string>());
     }
   }
-  file.close();
 }
 
 std::string M8::summary() const
@@ -226,37 +256,37 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
 {
   auto& ast = ast_.ast;
 
+  // init cache
+  Cache cache_ {_ifile};
+
   // init the parsing stack
   std::stack<Tmacro> stk;
 
-  // TODO change to reader class name
-  // init the parser with the input file
-  Parser p {_ifile};
+  // init the reader
+  Reader r;
+  if (! readline_ || ! _ifile.empty())
+  {
+    r.open_file(_ifile);
+  }
 
-  // TODO make this a writer class
-  // open the output file
-  std::ofstream ofile;
+  // init the writer
+  Writer w {_ofile};
   if (! _ofile.empty())
   {
-    ofile.open(_ofile);
-    if (! ofile.is_open())
-    {
-      throw std::runtime_error("could not open output file");
-    }
+    w.open();
   }
 
   std::string line;
-  while(p.get_next(line))
+  while(r.next(line))
   {
-
     // check for empty line
     if (line.empty())
     {
       if (stk.empty())
       {
-        if (! _ofile.empty())
+        if (! _ofile.empty() && copy_)
         {
-          ofile << "\n";
+          w.write("\n");
         }
         continue;
       }
@@ -268,43 +298,58 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
       }
     }
 
+    // case comment
+    if ((line.at(0) == ';'))
+    {
+      if (! stk.empty())
+      {
+        continue;
+      }
+    }
+
     // buffer to hold external chars
     std::string buf;
 
     // debug
     // std::cout << p.current_line() << ".\n" << line << "\n";
-    std::string mark_line;
-    mark_line.reserve(line.size() + (Cl::fg_black.size() * 2));
-    for (size_t i = 0; i < line.size(); ++i)
-    {
-      mark_line += " ";
-    }
-    mark_line = Cl::wrap(mark_line, {Cl::fg_green});
+    // std::string mark_line;
+    // mark_line.reserve(line.size() + (Cl::fg_black.size() * 2));
+    // for (size_t i = 0; i < line.size(); ++i)
+    // {
+    //   mark_line += " ";
+    // }
+    // mark_line = Cl::wrap(mark_line, {Cl::fg_green});
 
     // parse line char by char for either start or end delim
     for (size_t i = 0; i < line.size(); ++i)
     {
+      // std::cerr << "char[" << i << "] -> " << line.at(i) << "\n\n";
 
-      // check for comment ';'
-      if ((line.at(i) == ';') && stk.empty())
-      {
-        buf += line.substr(i, line.size() - i);
-        buf += "\n";
-        break;
-      }
+      // case comment
+      // if ((line.at(i) == ';') && line.at(i - 1) != '\\')
+      // {
+      //   break;
+      // }
 
-      // start delimiter
-      if (line.at(i) == delim_start_.at(0))
+      // case start delimiter
+      if (line.at(i) == delim_start_.at(0) )
       {
+        // if (i > 1 && line.at(i - 1) == '`')
+        // {
+        //   goto regular_char;
+        // }
+
         size_t pos_start = line.find(delim_start_, i);
-        if (pos_start != std::string::npos)
+        if (pos_start != std::string::npos && pos_start == i)
         {
+          // std::cerr << "\n" << line << "\n" << pos_start << "\n";
+
           //debug
-          mark_line.replace(pos_start + Cl::fg_black.size(), 1, "^");
+          // mark_line.replace(pos_start + Cl::fg_black.size(), 1, "^");
 
           // stack operations
           auto t = Tmacro();
-          t.line_start = p.current_line();
+          t.line_start = r.row();
           t.begin = pos_start;
           if (! stk.empty())
           {
@@ -318,18 +363,32 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
         }
       }
 
-      // end delimiter
+      // case end delimiter
       if (line.at(i) == delim_end_.at(0))
       {
+        // if (i + 1 < line.size() && line.at(i + 1) == '`')
+        // {
+        //   goto regular_char;
+        // }
+
         size_t pos_end = line.find(delim_end_, i);
-        if (pos_end != std::string::npos)
+        if (pos_end != std::string::npos && pos_end == i)
         {
+          // std::cerr << "\n" << line << "\n" << pos_end << "\n";
+
           //debug
-          mark_line.replace(pos_end + Cl::fg_black.size(), 1, "^");
+          // mark_line.replace(pos_end + Cl::fg_black.size(), 1, "^");
 
           // stack operations
           if (stk.empty())
           {
+            if (readline_)
+            {
+              std::cerr << "Error: missing opening delimiter\n";
+              i += delim_end_.size() - 1;
+              stk = std::stack<Tmacro>();
+              continue;
+            }
             throw std::runtime_error("missing opening delimiter");
           }
           else
@@ -337,13 +396,13 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
             auto t = stk.top();
             stk.pop();
 
-            t.line_end = p.current_line();
+            t.line_end = r.row();
             t.end = pos_end;
 
             // parse str into name and args
             {
               std::smatch match;
-              std::string name_args {"^\\s*([a-zA-Z0-9./*\\-+!?]+)\\s*([^\\r]*?)\\s*$"};
+              std::string name_args {"^\\s*([^\\s]+)\\s*([^\\r]*?)\\s*$"};
               if (std::regex_match(t.str, match, std::regex(name_args)))
               {
                 t.name = match[1];
@@ -353,6 +412,13 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
               }
               else
               {
+                if (readline_)
+                {
+                  std::cerr << "Error: invalid macro format\n";
+                  i += delim_end_.size() - 1;
+                  stk = std::stack<Tmacro>();
+                  continue;
+                }
                 throw std::runtime_error("invalid macro format");
               }
             }
@@ -387,38 +453,240 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                   }
                 }
 
+                if (readline_)
+                {
+                  std::cerr << "Error: undefined name\n";
+                  i += delim_end_.size() - 1;
+                  stk = std::stack<Tmacro>();
+                  continue;
+                }
                 throw std::runtime_error("undefined name");
               }
-              std::smatch match;
-              if (std::regex_match(t.args, match, std::regex(it->second.regex)))
+
+              if (it->second.regex.empty())
               {
-                for (auto const& e : match)
+                // args
+                // num, str, macro
+                // num:
+                //  -+1
+                //  -+.12
+                //  -+1.12
+                //  -+1/2
+                //  1e-+10
+                // str:
+                //  "str\"ing\n"
+                //  'str"ing\n'
+                // macro:
+                //  delim name args delim
+
+                std::vector<std::string> reg_num {
+                  {"^[\\-|+]{0,1}[0-9]+$"},
+                  {"^[\\-|+]{0,1}[0-9]*\\.[0-9]+$"},
+                  {"^[\\-|+]{0,1}[0-9]+e[\\-|+]{0,1}[0-9]+$"},
+                  // {"^[\\-|+]{0,1}[0-9]+/[\\-|+]{0,1}[0-9]+$"},
+                };
+
+                std::vector<std::string> reg_str {
+                  {"^\"(?:[^\\\"]+|\\.)*\"$"},
+                  {"^\'(?:[^\\\']+|\\.)*\'$"},
+                };
+
+                // complete arg string as first parameter
+                t.match.emplace_back(t.args);
+
+                for (size_t j = 0; j < t.args.size(); ++j)
                 {
-                  t.match.emplace_back(std::string(e));
+                  std::stringstream ss; ss << t.args.at(j);
+                  auto s = ss.str();
+                  // std::cerr << "E:" << e << "\n";
+                  if (s.find_first_of(" \n\t") != std::string::npos)
+                  {
+                    continue;
+                  }
+                  if (s.find_first_of(".-+0123456789") != std::string::npos)
+                  {
+                    // num
+                    // std::cerr << "Num\n";
+                    t.match.emplace_back(std::string());
+                    for (;j < t.args.size() && t.args.at(j) != ' '; ++j)
+                    {
+                      t.match.back() += t.args.at(j);
+                    }
+                    // std::cerr << "Arg\n" << t.match.back() << "\n";
+                    for (auto const& e : reg_num)
+                    {
+                      std::smatch m;
+                      if (std::regex_match(t.match.back(), m, std::regex(e)))
+                      {
+                        // std::cerr << "ArgValid\nnum\n" << t.match.back() << "\n\n";
+                      }
+                    }
+                    // if (t.match.back().find("/") != std::string::npos)
+                    // {
+                    //   auto n1 = t.match.back().substr(0, t.match.back().find("/"));
+                    //   auto n2 = t.match.back().substr(t.match.back().find("/") + 1);
+                    //   auto n = std::stod(n1) / std::stod(n2);
+                    //   std::stringstream ss; ss << n;
+                    //   t.match.back() = ss.str();
+                    //   std::cerr << "Simplified:\n" << t.match.back() << "\n\n";
+                    // }
+                  }
+                  else if (s.find_first_of("\"") != std::string::npos)
+                  {
+                    // str
+                    // std::cerr << "Str\n";
+                    t.match.emplace_back("");
+                    ++j; // skip start quote
+                    bool escaped {false};
+                    for (;j < t.args.size(); ++j)
+                    {
+                      if (! escaped && t.args.at(j) == '\"')
+                      {
+                        // skip end quote
+                        break;
+                      }
+                      if (t.args.at(j) == '\\')
+                      {
+                        escaped = true;
+                        continue;
+                      }
+                      if (escaped)
+                      {
+                        t.match.back() += "\\";
+                        t.match.back() += t.args.at(j);
+                        escaped = false;
+                        continue;
+                      }
+                      t.match.back() += t.args.at(j);
+                    }
+                    // std::cerr << "Arg\n" << t.match.back() << "\n";
+                    for (auto const& e : reg_str)
+                    {
+                      std::smatch m;
+                      if (std::regex_match(t.match.back(), m, std::regex(e)))
+                      {
+                        // std::cerr << "ArgValid\nstr\n" << t.match.back() << "\n\n";
+                      }
+                    }
+                  }
+                  else if (s.find_first_of("\'") != std::string::npos)
+                  {
+                    // str
+                    // std::cerr << "Str\n";
+                    t.match.emplace_back("");
+                    ++j; // skip start quote
+                    bool escaped {false};
+                    for (;j < t.args.size(); ++j)
+                    {
+                      if (! escaped && t.args.at(j) == '\'')
+                      {
+                        // skip end quote
+                        break;
+                      }
+                      if (t.args.at(j) == '\\')
+                      {
+                        escaped = true;
+                        continue;
+                      }
+                      if (escaped)
+                      {
+                        t.match.back() += "\\";
+                        t.match.back() += t.args.at(j);
+                        escaped = false;
+                        continue;
+                      }
+                      t.match.back() += t.args.at(j);
+                    }
+                    // std::cerr << "Arg\n" << t.match.back() << "\n";
+                    for (auto const& e : reg_str)
+                    {
+                      std::smatch m;
+                      if (std::regex_match(t.match.back(), m, std::regex(e)))
+                      {
+                        // std::cerr << "ArgValid\nstr\n" << t.match.back() << "\n\n";
+                      }
+                    }
+                  }
+                  else
+                  {
+                    // invalid arg
+                    if (readline_)
+                    {
+                      std::cerr << "Error: macro " + t.name + " has an invalid argument\n";
+                      i += delim_end_.size() - 1;
+                      stk = std::stack<Tmacro>();
+                      continue;
+                    }
+                    throw std::runtime_error("macro " + t.name + " has an invalid argument");
+                  }
                 }
+                // std::cerr << "ArgValid\ncomplete\n\n";
+              }
+              else
+              {
+                std::smatch match;
+                if (std::regex_match(t.args, match, std::regex(it->second.regex)))
+                {
+                  for (auto const& e : match)
+                  {
+                    t.match.emplace_back(std::string(e));
+                  }
+                }
+              }
 
                 // process macro
                 int ec {0};
+                Ctx ctx {t.res, t.match, cache_};
                 if (it->second.type == Mtype::internal)
                 {
-                  ec = run_internal(it->second, t.res, match, it->second.fn);
+                  ec = run_internal(it->second, ctx);
                 }
                 else if (it->second.type == Mtype::remote)
                 {
-                  ec = run_remote(it->second, t.res, match, it->second.fn);
+                  ec = run_remote(it->second, ctx);
                 }
                 else
                 {
-                  ec = run_external(it->second, t.res, match, it->second.fn);
+                  ec = run_external(it->second, ctx);
                 }
 
                 if (ec != 0)
                 {
+                  if (readline_)
+                  {
+                    std::cerr << "Error: macro " + t.name + " failed\n";
+                    i += delim_end_.size() - 1;
+                    stk = std::stack<Tmacro>();
+                    continue;
+                  }
                   throw std::runtime_error("macro " + t.name + " failed");
                 }
 
                 // debug
-                // std::cerr << t.res << std::endl;
+                // std::cerr << "\nRes:\n" << t.res << "\n\n";
+
+                if (t.res.find(delim_start_) != std::string::npos)
+                {
+                  {
+                    // remove all nl chars that follow delim_end
+                    // this would normally be removed by the reader
+                    size_t pos {0};
+                    for (;;)
+                    {
+                      pos = t.res.find(delim_end_ + "\n", pos);
+                      if (pos == std::string::npos) break;
+                      t.res.replace(pos, delim_end_.size() + 1, delim_end_);
+                      ++pos;
+                    }
+                  }
+
+                  // std::cerr << "line:\n" << line << "\n\n";
+                  line.insert(i + delim_end_.size(), t.res);
+                  // std::cerr << "res:\n" << t.res << "\n\n";
+                  // std::cerr << "line:\n" << line << "\n\n";
+                  i += delim_end_.size() - 1;
+                  continue;
+                }
 
                 if (! stk.empty())
                 {
@@ -427,30 +695,52 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                 else
                 {
                   buf += t.res;
+
+                  // account for when end delim is last char on line
+                  // add a newline char to buf
+                  // only if response is not empty
+                  if ((! t.res.empty()) && (i == line.size() - 1))
+                  {
+                    buf += "\n";
+                  }
+
+                  if (readline_)
+                  {
+                    std::cout << buf;
+
+                    if (! buf.empty() && buf.back() != '\n')
+                    {
+                      std::cout
+                      << AEC::reverse
+                      << "%"
+                      << AEC::reset
+                      << "\n";
+                    }
+                  }
                 }
 
-              }
-              else
-              {
-                std::cout << Cl::fg_red << "Invalid regex: " << Cl::reset;
-                std::cout << _ifile << ":"
-                  << t.line_start << ":" <<
-                  (t.begin + delim_start_.size() + 1) << "\n";
-                std::cout << Cl::fg_magenta << "macro: " << Cl::fg_green << t.name << t.args << "\n";
-                std::cout << Cl::fg_magenta << "regex: " << Cl::fg_green << it->second.regex << "\n" << Cl::reset;
-                throw std::runtime_error("invalid regex");
-              }
+              // }
+              // else
+              // {
+              //   std::cout << Cl::fg_red << "Invalid regex: " << Cl::reset;
+              //   std::cout << _ifile << ":"
+              //     << t.line_start << ":" <<
+              //     (t.begin + delim_start_.size() + 1) << "\n";
+              //   std::cout << Cl::fg_magenta << "macro: " << Cl::fg_green << t.name << t.args << "\n";
+              //   std::cout << Cl::fg_magenta << "regex: " << Cl::fg_green << it->second.regex << "\n" << Cl::reset;
+              //   throw std::runtime_error("invalid regex");
+              // }
             }
 
-            // if (stk.empty())
-            // {
-            //   ast.emplace_back(t);
-            // }
-            // else
-            // {
-            //   auto& l = stk.top();
-            //   l.children.emplace_back(t);
-            // }
+            if (stk.empty())
+            {
+              ast.emplace_back(t);
+            }
+            else
+            {
+              auto& l = stk.top();
+              l.children.emplace_back(t);
+            }
           }
 
           i += delim_end_.size() - 1;
@@ -458,9 +748,12 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
         }
       }
 
-      // append inner
+// regular_char:
+
+      // case else other characters
       if (! stk.empty())
       {
+        // inside macro
         auto& t = stk.top();
 
         if (i == (line.size() - 1))
@@ -475,14 +768,19 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
       }
       else
       {
-        if (i == (line.size() - 1))
+        // outside macro
+        // append to output buffer
+        if (copy_)
         {
-          buf += line.at(i);
-          buf += "\n";
-        }
-        else
-        {
-          buf += line.at(i);
+          if (i == (line.size() - 1))
+          {
+            buf += line.at(i);
+            buf += "\n";
+          }
+          else
+          {
+            buf += line.at(i);
+          }
         }
       }
 
@@ -491,8 +789,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
     // append buf to output file
     if (! _ofile.empty())
     {
-      ofile << buf;
-      ofile.flush();
+      w.write(buf);
     }
 
     // debug
@@ -503,236 +800,43 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
   if (! stk.empty())
   {
     throw std::runtime_error("missing closing delimiter");
+    std::cerr << "Error: missing closing delimiter\n";
+  }
+
+  if (! _ofile.empty())
+  {
+    w.close();
   }
 
   // debug
   // std::cerr << ast_.str() << std::endl;
+  // std::ofstream ofile_ast {"ast.txt"};
+  // ofile_ast << ast_.str();
+  // ofile_ast.close();
 }
 
-// void M8::run_(std::string const& ifile, std::string const& ofile)
-// {
-//   // check the input file
-//   ifile_.open(ifile);
-//   if (! ifile_.is_open())
-//   {
-//     throw std::runtime_error("could not open the input file");
-//   }
-
-//   // TODO incrementally read file
-
-//   // getline
-//   // store line number
-//   // search for start
-//   // if found store start line:column
-//   // search for additional start
-//   // if found recurse
-//   // search for end
-//   // if found store end line:column
-//   // read macro call into string buffer
-//   // perform macro
-//   // store result in struct
-//   // repeat until eof
-
-//   // back to start of file
-//   // getline to output file
-//   // until macro pos found
-//   // output macro result
-//   // continue until eof
-
-//   // read entire file into string
-//   std::string text;
-//   text.assign((std::istreambuf_iterator<char>(ifile_)),
-//     (std::istreambuf_iterator<char>()));
-
-//   // close input file
-//   ifile_.close();
-
-//   // check the output file
-//   if (ofile.empty())
-//   {
-//     use_stdout_ = true;
-//   }
-//   else
-//   {
-//     ofile_.open(ofile);
-//     if (! ofile_.is_open())
-//     {
-//       throw std::runtime_error("could not open the output file");
-//     }
-//   }
-
-//   // bool done {true};
-
-//   // loop for multiple passes to make sure all macros were found
-//   // do
-//   // {
-//   //   done = true;
-
-//     std::string::size_type str_start {0};
-//     std::string::size_type str_end {0};
-
-//     ++pass_count_;
-//     if (debug_)
-//     {
-//       std::cerr << "Debug: pass -> " << pass_count_ << "\n";
-//     }
-
-//     std::function<int(std::string::size_type pos_start, std::string::size_type pos_end, int depth)> const
-//       find_and_replace = [&](std::string::size_type pos_start, std::string::size_type pos_end, int depth) {
-//       for (/* */; pos_start != std::string::npos; ++pos_start)
-//       {
-//         if (debug_)
-//         {
-//           std::cerr << "Debug: depth -> " << depth << "\n";
-//         }
-
-//         pos_start = text.find(delim_start_, pos_start);
-//         pos_end = text.find(delim_end_, pos_start);
-
-//         if (pos_start == std::string::npos || pos_end == std::string::npos)
-//         {
-//           break;
-//         }
-
-//         // if additional start delim is found before end delim, recurse
-//         if (text.substr(pos_start + 1, pos_end).find(delim_start_, 0) != std::string::npos)
-//         {
-//           find_and_replace(pos_start + 1, pos_end, depth + 1);
-
-//           // find the new end delim
-//           pos_end = text.find(delim_end_, pos_start);
-//           if (pos_end == std::string::npos)
-//           {
-//             break;
-//           }
-//         }
-
-//         size_t len = (pos_end - pos_start + len_end);
-//         std::string fn = text.substr((pos_start + len_start), (len - len_start - len_end));
-//         std::string name = fn.substr(0, fn.find_first_of(" ", 0));
-//         if (debug_)
-//         {
-//           std::cerr << "Debug: depth -> " << depth << "\n";
-//           std::cerr << "Debug: fn -> " << fn << "\n";
-//           std::cerr << "Debug: name -> " << name << "\n";
-//         }
-
-//         // check if macro exists
-//         auto const it = macros.find(name);
-//         if (it == macros.end())
-//         {
-//           // TODO how should undefined macro be treated
-//           ++warning_count_;
-//           std::cout << "Warning: undefined macro '" << name << "'\n";
-//           text.replace(pos_start, len, "");
-//           // text.replace(pos_start, len, "/* " + fn + " */");
-//           // skip to end of invalid macro
-//           pos_start = pos_end;
-//           continue;
-//         }
-
-//         std::string args = fn.substr(fn.find_first_of(" ") + 1, fn.size());
-//         if (debug_)
-//         {
-//           std::cerr << "Debug: args -> " << args << "\n";
-//         }
-
-//         // match the defined regex
-//         std::smatch match;
-//         if (std::regex_match(args, match, std::regex(it->second.regex)))
-//         {
-//           int ec {0};
-//           std::string res;
-
-//           if (it->second.type == Mtype::internal)
-//           {
-//             ec = run_internal(it->second, res, match, it->second.fn);
-//           }
-//           else if (it->second.type == Mtype::remote)
-//           {
-//             ec = run_remote(it->second, res, match, it->second.fn);
-//           }
-//           else
-//           {
-//             ec = run_external(it->second, res, match, it->second.fn);
-//           }
-
-//           // TODO handle when function return error
-//           // replace text with what?
-//           if (ec != 0)
-//           {
-//             // std::cout << "Error: macro '" << it->first << "' failed\n";
-//             // std::cout << "Info: " << it->second.info << "\n";
-//             // std::cout << "Usage: " << it->second.usage << "\n";
-//             // std::cout << "Regex: " << it->second.regex << "\n";
-//             // std::cout << "Res: " << res << "\n";
-//             return 1;
-//           }
-//           else
-//           {
-//             text.replace(pos_start, len, res);
-//             ++macro_count_;
-//             // done = false;
-
-//             // if (depth > 0) break;
-//           }
-//         }
-//         else
-//         {
-//           // TODO how should invalid regex be treated
-//           ++warning_count_;
-//           std::cout << "Warning: macro '" << name << "' has invalid regex\n";
-//           text.replace(pos_start, len, "");
-//           // text.replace(pos_start, len, "/* " + fn + " */");
-//           // skip to end of invalid macro
-//           pos_start = pos_end;
-//         }
-//       }
-
-//       return 0;
-//     };
-
-//     find_and_replace(str_start, str_end, 0);
-
-//   // }
-//   // while (! done);
-
-//   if (use_stdout_)
-//   {
-//     std::cout << text << std::flush;
-//   }
-//   else
-//   {
-//     // write to output file
-//     ofile_ << text;
-
-//     // close output file
-//     ofile_.close();
-//   }
-// }
-
-int M8::run_internal(Macro macro, std::string& res, std::smatch const match, macro_fn fn)
+int M8::run_internal(Macro const& macro, Ctx& ctx)
 {
   ++internal_count_;
 
-  return fn(res, match);
+  return macro.func(ctx);
 }
 
-int M8::run_external(Macro macro, std::string& res, std::smatch const match, macro_fn fn)
+int M8::run_external(Macro const& macro, Ctx& ctx)
 {
   ++external_count_;
 
   std::string m_args;
-  for (size_t i = 1; i < match.size(); ++i)
+  for (size_t i = 1; i < ctx.args.size(); ++i)
   {
-    m_args += match[i];
-    if (i < match.size() - 1)
+    m_args += ctx.args[i];
+    if (i < ctx.args.size() - 1)
       m_args += " ";
   }
-  return exec(res, macro.name + " " + m_args);
+  return exec(ctx.str, macro.name + " " + m_args);
 }
 
-int M8::run_remote(Macro macro, std::string& res, std::smatch const match, macro_fn fn)
+int M8::run_remote(Macro const& macro, Ctx& ctx)
 {
   ++remote_count_;
 
@@ -743,7 +847,7 @@ int M8::run_remote(Macro macro, std::string& res, std::smatch const match, macro
 
   Json data;
   data["name"] = macro.name;
-  data["args"] = match;
+  data["args"] = ctx.args;
   api.req.data = data.dump();
 
   std::cout << "Remote macro call -> " << macro.name << "\n";
@@ -756,7 +860,7 @@ int M8::run_remote(Macro macro, std::string& res, std::smatch const match, macro
     }
     else
     {
-      res = api.res.body;
+      ctx.str = api.res.body;
       return 0;
     }
   })};
@@ -771,9 +875,13 @@ int M8::run_remote(Macro macro, std::string& res, std::smatch const match, macro
 
   int ec = send.get();
   if (ec == 0)
+  {
     std::cout << "\033[2K\r" << "Success: remote call\n";
+  }
   else
+  {
     std::cout << "\033[2K\r" << "Error: remote call\n";
+  }
 
   return ec;
 }
