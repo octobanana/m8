@@ -38,6 +38,7 @@ set (SOURCES
   src/sys_command.cc
   src/http.cc
   src/crypto.cc
+  src/string.cc
 )
 
 set (HEADERS

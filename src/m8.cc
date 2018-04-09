@@ -23,6 +23,9 @@ using Cache = OB::Cache;
 #include "crypto.hh"
 #include "http.hh"
 
+#include "string.hh"
+namespace String = OB::String;
+
 #include "color.hh"
 namespace Cl = OB::Color;
 
@@ -332,16 +335,17 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
       // }
 
       // case start delimiter
-      if (line.at(i) == delim_start_.at(0) )
+      if (line.at(i) == delim_start_.at(0))
       {
-        // if (i > 1 && line.at(i - 1) == '`')
-        // {
-        //   goto regular_char;
-        // }
-
         size_t pos_start = line.find(delim_start_, i);
         if (pos_start != std::string::npos && pos_start == i)
         {
+          if (i > 0 && line.at(i - 1) == '`')
+          {
+            // std::cerr << "Found meta macro start\n";
+            goto regular_char;
+          }
+
           // std::cerr << "\n" << line << "\n" << pos_start << "\n";
 
           //debug
@@ -366,14 +370,22 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
       // case end delimiter
       if (line.at(i) == delim_end_.at(0))
       {
-        // if (i + 1 < line.size() && line.at(i + 1) == '`')
-        // {
-        //   goto regular_char;
-        // }
-
         size_t pos_end = line.find(delim_end_, i);
         if (pos_end != std::string::npos && pos_end == i)
         {
+          if (i + delim_end_.size() < line.size() && line.at(i + delim_end_.size()) == '`')
+          {
+            // std::cerr << "Found meta macro end\n";
+            // std::cerr
+            // << "INFO:\n"
+            // << "i:" << i << "\n"
+            // << "line.size():" << line.size() << "\n"
+            // << "line.at(i + delim_end_.size()):" << line.at(i + delim_end_.size()) << "\n"
+            // ;
+
+            goto regular_char;
+          }
+
           // std::cerr << "\n" << line << "\n" << pos_end << "\n";
 
           //debug
@@ -489,6 +501,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                 std::vector<std::string> reg_str {
                   {"^\"(?:[^\\\"]+|\\.)*\"$"},
                   {"^\'(?:[^\\\']+|\\.)*\'$"},
+                  {"^`(?:[^\\`]+|\\.)*`$"},
                 };
 
                 // complete arg string as first parameter
@@ -498,11 +511,29 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                 {
                   std::stringstream ss; ss << t.args.at(j);
                   auto s = ss.str();
-                  // std::cerr << "E:" << e << "\n";
+                  // std::cerr << "arg:" << s << "\n";
                   if (s.find_first_of(" \n\t") != std::string::npos)
                   {
                     continue;
                   }
+                  // if (s.find_first_of(".") != std::string::npos)
+                  // {
+                  //   // macro
+                  //   t.match.emplace_back(std::string());
+                  //   for (;j < t.args.size() && t.args.at(j) != '.'; ++j)
+                  //   {
+                  //     t.match.back() += t.args.at(j);
+                  //   }
+                  //   std::cerr << "Arg-Macro:\n~" << t.match.back() << "~\n";
+                  //   for (auto const& e : reg_num)
+                  //   {
+                  //     std::smatch m;
+                  //     if (std::regex_match(t.match.back(), m, std::regex(e)))
+                  //     {
+                  //       // std::cerr << "ArgValid\nmacro\n" << t.match.back() << "\n\n";
+                  //     }
+                  //   }
+                  // }
                   if (s.find_first_of(".-+0123456789") != std::string::npos)
                   {
                     // num
@@ -512,7 +543,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                     {
                       t.match.back() += t.args.at(j);
                     }
-                    // std::cerr << "Arg\n" << t.match.back() << "\n";
+                    // std::cerr << "Arg-Num\n" << t.match.back() << "\n";
                     for (auto const& e : reg_num)
                     {
                       std::smatch m;
@@ -559,7 +590,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                       }
                       t.match.back() += t.args.at(j);
                     }
-                    // std::cerr << "Arg\n" << t.match.back() << "\n";
+                    // std::cerr << "Arg-Str\n" << t.match.back() << "\n";
                     for (auto const& e : reg_str)
                     {
                       std::smatch m;
@@ -597,7 +628,45 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                       }
                       t.match.back() += t.args.at(j);
                     }
-                    // std::cerr << "Arg\n" << t.match.back() << "\n";
+                    // std::cerr << "Arg-Str\n" << t.match.back() << "\n";
+                    for (auto const& e : reg_str)
+                    {
+                      std::smatch m;
+                      if (std::regex_match(t.match.back(), m, std::regex(e)))
+                      {
+                        // std::cerr << "ArgValid\nstr\n" << t.match.back() << "\n\n";
+                      }
+                    }
+                  }
+                  else if (s.find_first_of("`") != std::string::npos)
+                  {
+                    // literal
+                    // std::cerr << "Str\n";
+                    t.match.emplace_back("");
+                    ++j; // skip start quote
+                    bool escaped {false};
+                    for (;j < t.args.size(); ++j)
+                    {
+                      if (! escaped && t.args.at(j) == '`')
+                      {
+                        // skip end quote
+                        break;
+                      }
+                      if (t.args.at(j) == '\\')
+                      {
+                        escaped = true;
+                        continue;
+                      }
+                      if (escaped)
+                      {
+                        t.match.back() += "\\";
+                        t.match.back() += t.args.at(j);
+                        escaped = false;
+                        continue;
+                      }
+                      t.match.back() += t.args.at(j);
+                    }
+                    // std::cerr << "Arg-Str\n" << t.match.back() << "\n";
                     for (auto const& e : reg_str)
                     {
                       std::smatch m;
@@ -632,22 +701,53 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                     t.match.emplace_back(std::string(e));
                   }
                 }
+                // else
+                // {
+                  // std::cout << Cl::fg_red << "Invalid regex: " << Cl::reset;
+                  // std::cout << _ifile << ":"
+                  //   << t.line_start << ":" <<
+                  //   (t.begin + delim_start_.size() + 1) << "\n";
+                  // std::cout << Cl::fg_magenta << "macro: " << Cl::fg_green << t.name << t.args << "\n";
+                  // std::cout << Cl::fg_magenta << "regex: " << Cl::fg_green << it->second.regex << "\n" << Cl::reset;
+                  // if (readline_)
+                  // {
+                  //   std::cerr << "macro " + t.name + " failed\n-> " + e.what() + "\n";
+                  //   i += delim_end_.size() - 1;
+                  //   stk = std::stack<Tmacro>();
+                  //   continue;
+                  // }
+                  // throw std::runtime_error("invalid regex");
+                // }
               }
 
                 // process macro
                 int ec {0};
                 Ctx ctx {t.res, t.match, cache_};
-                if (it->second.type == Mtype::internal)
+                try
                 {
-                  ec = run_internal(it->second, ctx);
+                  if (it->second.type == Mtype::internal)
+                  {
+                    ec = run_internal(it->second, ctx);
+                  }
+                  else if (it->second.type == Mtype::remote)
+                  {
+                    ec = run_remote(it->second, ctx);
+                  }
+                  else
+                  {
+                    ec = run_external(it->second, ctx);
+                  }
                 }
-                else if (it->second.type == Mtype::remote)
+                catch (std::exception const& e)
                 {
-                  ec = run_remote(it->second, ctx);
-                }
-                else
-                {
-                  ec = run_external(it->second, ctx);
+                  if (readline_)
+                  {
+                    std::cerr << "macro " + t.name + " failed\n-> " + e.what() + "\n";
+                    i += delim_end_.size() - 1;
+                    stk = std::stack<Tmacro>();
+                    continue;
+                  }
+                  throw std::runtime_error("macro " + t.name + " failed\n-> " + e.what() + "\n");
                 }
 
                 if (ec != 0)
@@ -663,7 +763,10 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                 }
 
                 // debug
-                // std::cerr << "\nRes:\n" << t.res << "\n\n";
+                if (debug_)
+                {
+                  std::cerr << "\nRes:\n~" << t.res << "~\n";
+                }
 
                 if (t.res.find(delim_start_) != std::string::npos)
                 {
@@ -719,17 +822,6 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                   }
                 }
 
-              // }
-              // else
-              // {
-              //   std::cout << Cl::fg_red << "Invalid regex: " << Cl::reset;
-              //   std::cout << _ifile << ":"
-              //     << t.line_start << ":" <<
-              //     (t.begin + delim_start_.size() + 1) << "\n";
-              //   std::cout << Cl::fg_magenta << "macro: " << Cl::fg_green << t.name << t.args << "\n";
-              //   std::cout << Cl::fg_magenta << "regex: " << Cl::fg_green << it->second.regex << "\n" << Cl::reset;
-              //   throw std::runtime_error("invalid regex");
-              // }
             }
 
             if (stk.empty())
@@ -748,7 +840,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
         }
       }
 
-// regular_char:
+regular_char:
 
       // case else other characters
       if (! stk.empty())
@@ -758,8 +850,11 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
 
         if (i == (line.size() - 1))
         {
-          t.str += line.at(i);
-          t.str += "\n";
+          if (line.at(i) != '\\')
+          {
+            t.str += line.at(i);
+            t.str += "\n";
+          }
         }
         else
         {
@@ -774,8 +869,11 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
         {
           if (i == (line.size() - 1))
           {
-            buf += line.at(i);
-            buf += "\n";
+            if (line.at(i) != '\\')
+            {
+              buf += line.at(i);
+              buf += "\n";
+            }
           }
           else
           {
@@ -792,8 +890,14 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
       w.write(buf);
     }
 
+    if (debug_)
+    {
+      std::cerr << "AST:\n" << ast_.str() << "\n";
+      ast_.clear();
+    }
+
     // debug
-    // std::cout << mark_line << "\n\n";
+    // std::cerr << mark_line << "\n\n";
 
   }
 
@@ -807,12 +911,6 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
   {
     w.close();
   }
-
-  // debug
-  // std::cerr << ast_.str() << std::endl;
-  // std::ofstream ofile_ast {"ast.txt"};
-  // ofile_ast << ast_.str();
-  // ofile_ast.close();
 }
 
 int M8::run_internal(Macro const& macro, Ctx& ctx)

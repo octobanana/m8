@@ -33,6 +33,11 @@ std::string Ast::str()
   return ss.str();
 }
 
+void Ast::clear()
+{
+  ast = {};
+}
+
 std::string Ast::recurse_tmacro(Tmacro const& t, size_t depth)
 {
   std::string indent_base {Cl::fg_blue + ". " + Cl::reset};

@@ -4,6 +4,9 @@
 #include "http.hh"
 #include "crypto.hh"
 
+#include "string.hh"
+namespace String = OB::String;
+
 #include "color.hh"
 namespace Cl = OB::Color;
 
@@ -43,192 +46,28 @@ namespace fs = std::experimental::filesystem;
 namespace Macros
 {
 
-// cpp macros
 #define var auto
 #define let auto const
 #define fn auto
 
+
+// variables
+
 // shared database for key value pairs
 var db = std::map<std::string, std::string>();
 
-// prototypes
-fn repeat(std::string const& str, size_t num) -> std::string;
-fn replace_all(std::string& str, std::string const& key, std::string const& val) -> void;
-fn unescape_str(std::string& str) -> void;
-fn delimit(std::string const& str, std::string const& delim) -> std::vector<std::string>;
-fn delimit_first(std::string const& str, std::string const& delim) -> std::vector<std::string>;
-fn format(std::string str, std::string const key, std::vector<std::string> const& args) -> std::string;
-fn str_count(std::string const& str, std::string const& s) -> size_t;
-
-// helper functions
-fn repeat(std::string const& str, size_t num) -> std::string
-{
-  if (num < 2) return str;
-  auto res = std::string();
-  for (size_t i = 0; i < num; ++i)
-  {
-    res += str;
-  }
-  return res;
-}
-
-void unescape_str(std::string& str)
-{
-  size_t pos {0};
-
-  for (;; ++pos)
-  {
-    pos = str.find("\\", pos);
-    if (pos == std::string::npos || pos + 1 == std::string::npos) break;
-    if (str.at(pos + 1) == 'n')
-    {
-      str.replace(pos, 2, "\n");
-    }
-    else if (str.at(pos + 1) == 't')
-    {
-      str.replace(pos, 2, "\t");
-    }
-    else if (str.at(pos + 1) == 'r')
-    {
-      str.replace(pos, 2, "\r");
-    }
-    else if (str.at(pos + 1) == 'a')
-    {
-      str.replace(pos, 2, "\a");
-    }
-    else if (str.at(pos + 1) == 'b')
-    {
-      str.replace(pos, 2, "\b");
-    }
-    else if (str.at(pos + 1) == 'f')
-    {
-      str.replace(pos, 2, "\f");
-    }
-    else if (str.at(pos + 1) == 'v')
-    {
-      str.replace(pos, 2, "\v");
-    }
-    else if (str.at(pos + 1) == '\\')
-    {
-      str.replace(pos, 2, "\\");
-    }
-    else if (str.at(pos + 1) == '"')
-    {
-      str.replace(pos, 2, "\"");
-    }
-    else if (str.at(pos + 1) == '\'')
-    {
-      str.replace(pos, 2, "'");
-    }
-    else if (str.at(pos + 1) == '?')
-    {
-      str.replace(pos, 2, "\?");
-    }
-  }
-}
-
-void replace_all(std::string& str, std::string const& key, std::string const& val)
-{
-  size_t pos {0};
-
-  for (;;)
-  {
-    pos = str.find(key, pos);
-    if (pos == std::string::npos) break;
-    str.replace(pos, key.size(), val);
-    ++pos;
-  }
-}
-
-std::vector<std::string> delimit(std::string const& str, std::string const& delim)
-{
-  std::vector<std::string> vtok;
-  auto start = 0U;
-  auto end = str.find(delim);
-  while (end != std::string::npos) {
-    vtok.emplace_back(str.substr(start, end - start));
-    start = end + delim.length();
-    end = str.find(delim, start);
-  }
-  vtok.emplace_back(str.substr(start, end));
-  return vtok;
-}
-
-std::vector<std::string> delimit_first(std::string const& str, std::string const& delim)
-{
-  auto vtok = std::vector<std::string>();
-  auto pos = str.find(delim);
-  if (pos != std::string::npos) {
-    vtok.emplace_back(str.substr(0, pos));
-    if (pos + delim.size() != std::string::npos)
-    {
-      vtok.emplace_back(str.substr(pos + delim.size()));
-    }
-  }
-  return vtok;
-}
-
-std::string format(std::string str, std::string const key, std::vector<std::string> const& args)
-{
-  size_t pos {0};
-
-  for (auto const& e : args)
-  {
-    pos = str.find(key, pos);
-    if (pos == std::string::npos) break;
-    str.replace(pos, key.size(), e);
-    ++pos;
-  }
-  return str;
-}
-
-size_t str_count(std::string const& str, std::string const& s)
-{
-  size_t count {0};
-  size_t pos {0};
-
-  for (;;)
-  {
-    pos = str.find(s, pos);
-    if (pos == std::string::npos) break;
-    ++count;
-    ++pos;
-  }
-  return count;
-}
+std::string m8_delim_start;
+std::string m8_delim_end;
 
 // macro functions
-// std::function<std::string(std::string& response, std::smatch const& match)>
-
-// auto const fn_main = [](auto& ctx) {
-//   auto str = ctx.args.at(1);
-//   std::stringstream ss;
-//   ss << "int main(int argc, char* argv[])\n"
-//      << "{"
-//      << str
-//      << "}";
-//   ctx.str = ss.str();
-//   return 0;
-// };
 
 auto const fn_repeat = [](auto& ctx) {
-  auto res = repeat(ctx.args.at(1), std::stoul(ctx.args.at(2)));
+  auto res = String::repeat(ctx.args.at(1), std::stoul(ctx.args.at(2)));
   std::stringstream ss;
   ss << res;
   ctx.str = ss.str();
   return 0;
 };
-
-// auto const fn_add = [](auto& ctx) {
-//   auto type = std::string(m[1]);
-//   std::stringstream ss;
-//   ss << type << " add(" << type << " x, " << type << " y)\n"
-//      << "{\n"
-//      << "  return x + y;\n"
-//      << "}\n";
-//   s = ss.str();
-//   return 0;
-// };
 
 auto const fn_comment_header = [](auto& ctx) {
   std::stringstream ss; ss
@@ -391,7 +230,7 @@ auto const fn_str = [](auto& ctx) {
 
 auto const fn_prt = [](auto& ctx) {
   auto str = ctx.args.at(1);
-  unescape_str(str);
+  str = String::unescape(str);
   std::cout << str << std::flush;
   return 0;
 };
@@ -403,7 +242,7 @@ auto const fn_print = [](auto& ctx) {
     ss << ctx.args.at(i);
   }
   std::string str = ss.str();
-  unescape_str(str);
+  str = String::unescape(str);
   std::cout << str << std::flush;
   return 0;
 };
@@ -510,8 +349,8 @@ auto const fn_http_get = [&](auto& ctx) {
 auto const fn_http_post = [&](auto& ctx) {
   auto url = ctx.args.at(1);
   auto data = ctx.args.at(2);
-  unescape_str(url);
-  unescape_str(data);
+  url = String::unescape(url);
+  data = String::unescape(data);
   Http api;
   api.req.method = "POST";
   api.req.url = url;
@@ -543,7 +382,7 @@ auto const fn_set = [&](auto& ctx) {
     ss << ctx.args.at(i);
   }
   str = ss.str();
-  unescape_str(str);
+  str = String::unescape(str);
 
   db[key] = str;
   return 0;
@@ -577,9 +416,9 @@ auto const fn_template = [&](auto& ctx) {
     tmp = tmp.replace(tmp.find(name), name.size(), str);
   }
 
-  unescape_str(tmp);
-  replace_all(tmp, "[[", "((");
-  replace_all(tmp, "]]", "))");
+  tmp = String::unescape(tmp);
+  tmp = String::replace_all(tmp, "[[", "((");
+  tmp = String::replace_all(tmp, "]]", "))");
   ctx.str = tmp;
 
   return 0;
@@ -587,6 +426,7 @@ auto const fn_template = [&](auto& ctx) {
 
 // define macros
 // M8::set_macro(name, info, usage, regex, func)
+
 void macros(M8& m8)
 {
   // m8.set_macro("",
@@ -599,7 +439,61 @@ void macros(M8& m8)
   //   return 0;
   //   });
 
-  m8.set_macro("printc",
+  m8.set_macro("eq",
+    "",
+    "",
+    "",
+    [&](auto& ctx) {
+    var n1 = std::stod(ctx.args.at(1));
+    var n2 = std::stod(ctx.args.at(2));
+    var res = std::string("0");
+    if (n1 == n2)
+    {
+      res = "1";
+    }
+    ctx.str = res;
+    return 0;
+    });
+
+  m8.set_macro("nop",
+    "",
+    "",
+    "",
+    [&](auto& ctx) {
+    ctx.str = ctx.args.at(1);
+    return 0;
+    });
+
+  m8.set_macro("if",
+    "if cond true false",
+    "",
+    "",
+    [&](auto& ctx) {
+    std::string cond {ctx.args.at(1)};
+    std::string first {ctx.args.at(2)};
+    std::string second {ctx.args.at(3)};
+
+    if (std::stoi(cond) != 0)
+    {
+      // std::cerr << "first:\n" << first << "\n";
+      // replace_all(first, "." + m8_delim_start, m8_delim_start);
+      // replace_all(first, m8_delim_end + ".", m8_delim_end);
+      // std::cerr << "first:\n" << first << "\n";
+      ctx.str = first;
+    }
+    else
+    {
+      // std::cerr << "second:\n" << second << "\n";
+      // replace_all(second, "." + m8_delim_start, m8_delim_start);
+      // replace_all(second, m8_delim_end + ".", m8_delim_end);
+      // std::cerr << "second:\n" << second << "\n";
+      ctx.str = second;
+    }
+
+    return 0;
+    });
+
+  m8.set_macro("printc!",
     "",
     "",
     "",
@@ -611,7 +505,7 @@ void macros(M8& m8)
       ss << ctx.args.at(i);
     }
     std::string str = ss.str();
-    unescape_str(str);
+    str = String::unescape(str);
     std::cout << AEC::fg_true(col) << str << AEC::reset << std::flush;
     return 0;
     });
@@ -622,8 +516,10 @@ void macros(M8& m8)
     "^(.+?)\\s+(?:M8\\!|)([^\\r]+?)(?:\\!8M|$)",
     [&](auto& ctx) {
     var name = ctx.args.at(1);
+    var delim_start = m8_delim_start;
+    var delim_end = m8_delim_end;
 
-    m8.set_macro(name, "", "", "", [&, name](auto& ctx) {
+    m8.set_macro(name, "", "", "", [&, name, delim_start, delim_end](auto& ctx) {
       if (db.find(name) == db.end()) return -1;
       auto tmp = db[name];
 
@@ -632,20 +528,10 @@ void macros(M8& m8)
       {
         auto pos = ctx.args.at(i).find(":");
         if (pos == std::string::npos) continue;
-        // auto name = "{" + ctx.args.at(i).substr(0, pos) + "}";
         auto name = ctx.args.at(i).substr(0, pos);
         auto str = ctx.args.at(i).substr(pos + 1);
         arg_map[name] = str;
       }
-
-      // size_t pos_name {0};
-      // for (;;)
-      // {
-      //   pos_name = tmp.find(name);
-      //   if (pos_name == std::string::npos) break;
-      //   tmp = tmp.replace(pos_name, name.size(), str);
-      //   ++pos_name;
-      // }
 
       if (! arg_map.empty())
       {
@@ -674,11 +560,10 @@ void macros(M8& m8)
         }
       }
 
-      unescape_str(tmp);
-      replace_all(tmp, "[[", "((");
-      replace_all(tmp, "]]", "))");
+      // unescape_str(tmp);
+      tmp = String::replace_first(tmp, "`" + delim_start, delim_start);
+      tmp = String::replace_last(tmp, delim_end + "`", delim_end);
       ctx.str = tmp;
-      // std::cerr << "run-" << name << ":\n" << tmp << "~~~\n";
       return 0;
     });
 
@@ -689,11 +574,7 @@ void macros(M8& m8)
       ss << ctx.args.at(i);
     }
     str = ss.str();
-    // unescape_str(str);
-
-    // std::cerr << "def-" << name << ":\n" << str << "~~~\n";
     db[name] = str;
-
     return 0;
     });
 
@@ -865,7 +746,7 @@ void macros(M8& m8)
     [&](auto& ctx) {
       auto search = ctx.args.at(1);
       auto str = ctx.args.at(2);
-      auto count = str_count(str, search);
+      auto count = String::count(str, search);
       ctx.str = std::to_string(count);
       return 0;
     });
@@ -900,15 +781,12 @@ void macros(M8& m8)
   m8.set_macro("http-get",
     "http get request",
     "get \"url\"",
-    // "^\"(.+)\"$",
     "",
     fn_http_get);
 
   m8.set_macro("http-post",
     "http post request",
     "post \"url\" \"data\"",
-    // regex is invalid
-    // "^\"(.+?)\"\\s+\"((?:[^\"\\]|\\.)*)\"$",
     "",
     fn_http_post);
 
@@ -948,6 +826,39 @@ void macros(M8& m8)
       return 0;
     });
 
+  m8.set_macro("date",
+    "the current date timestamp",
+    "date",
+    "",
+    [&](auto& ctx) {
+      std::stringstream ss;
+      std::time_t t {std::time(nullptr)};
+      std::tm tm = *std::localtime(&t);
+      if (ctx.args.size() == 2)
+      {
+        auto str = ctx.args.at(1);
+        ss << std::put_time(&tm, str.c_str());
+      }
+      else
+      {
+        ss << std::asctime(&tm);
+      }
+      ctx.str = ss.str();
+      return 0;
+    });
+
+  m8.set_macro("abs",
+    "absolute value of number",
+    "abs <num>",
+    "",
+    [&](auto& ctx) {
+      auto n = std::stod(ctx.args.at(1));
+      n = std::fabs(n);
+      std::stringstream ss; ss << n;
+      ctx.str = ss.str();
+      return 0;
+    });
+
   m8.set_macro("^",
     "the exponent operator",
     "/ n1 n2",
@@ -982,7 +893,6 @@ void macros(M8& m8)
     "the addition operator",
     "+ n1 n2",
     "",
-    // "^([0-9]+)\\s+([0-9]+)$",
     fn_math_add);
 
   m8.set_macro("nl",
@@ -1030,13 +940,13 @@ void macros(M8& m8)
   m8.set_macro("sourcepp",
     "templates a c++ source file structure",
     "sourcepp str",
-    "^\\((.+)\\)$",
+    "^(.+)$",
     fn_sourcepp);
 
   m8.set_macro("headerpp",
     "templates a c++ header file structure",
     "headerpp str",
-    "^\\((.+)\\)$",
+    "^(.+)$",
     fn_headerpp);
 
   m8.set_macro("env",
@@ -1044,12 +954,6 @@ void macros(M8& m8)
     "env str",
     "^(.+)$",
     fn_env);
-
-  // m8.set_macro("main",
-  //   "template c++ main function",
-  //   "main (str) EOF",
-  //   "^\\(([^\\r]*?)\\)EOF$",
-  //   fn_main);
 
   m8.set_macro("sh",
     "execute a shell command",
@@ -1065,8 +969,7 @@ void macros(M8& m8)
 
   m8.set_macro("license",
     "insert a license header",
-    "license (license, author, year)",
-    // "^\\(\"(.+?)\", \"(.+?)\", \"(.+?)\"\\)$",
+    "license <license> <author> <year>)",
     "",
     fn_license);
 
@@ -1076,16 +979,15 @@ void macros(M8& m8)
     "^\"([^\\r]+?)\", ([0-9]+)$",
     fn_repeat);
 
-  // m8.set_macro("add",
-  //   "template add function",
-  //   "add type",
-  //   "^(.+?)$",
-  //   fn_add);
-
   m8.set_macro("comment_header",
     "outputs the authors name, timestamp, version, and description in a c++ comment block",
     "comment_header (version, author, description)",
     "^\\(([.0-9]+?), \"(.+?)\", \"(.+?)\"\\)$",
     fn_comment_header);
 }
+
+#undef var
+#undef let
+#undef fn
+
 } // namespace Macros

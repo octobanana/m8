@@ -30,6 +30,7 @@ public:
   ~Ast();
 
   std::string str();
+  void clear();
 
   std::vector<Tmacro> ast;
 

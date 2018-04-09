@@ -142,10 +142,14 @@ int start_m8(Parg& pg)
       replace_all(rdelim, "{", "}");
       replace_all(rdelim, "<", ">");
       m8.set_delimits(delim, rdelim);
+      Macros::m8_delim_start = delim;
+      Macros::m8_delim_end = rdelim;
     }
     else if (pg.find("start") && pg.find("end"))
     {
       m8.set_delimits(pg.get("start"), pg.get("end"));
+      Macros::m8_delim_start = pg.get("start");
+      Macros::m8_delim_end = pg.get("end");
     }
 
     // parse

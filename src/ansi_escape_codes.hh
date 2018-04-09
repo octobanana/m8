@@ -10,9 +10,6 @@ namespace OB
 {
 namespace ANSI_Escape_Codes
 {
-  // prototypes
-  std::string cursor_set(size_t x, size_t y);
-
   // standard escaped characters
   std::string const nl {"\n"};
   std::string const cr {"\r"};
@@ -54,6 +51,8 @@ namespace ANSI_Escape_Codes
   std::string const cursor_down {esc + "1B"};
   std::string const cursor_right {esc + "1C"};
   std::string const cursor_left {esc + "1D"};
+  std::string const cursor_save {"\0337"};
+  std::string const cursor_load {"\0338"};
 
   // foreground color
   std::string const fg_black {esc + "30m"};
