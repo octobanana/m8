@@ -50,6 +50,7 @@ using Json = nlohmann::json;
 #include <future>
 #include <iterator>
 #include <stack>
+#include <algorithm>
 
 M8::M8()
 {
@@ -185,9 +186,6 @@ void M8::set_config(std::string file_name)
   }
 
   // read in the config file into memory
-  // std::string content;
-  // content.assign((std::istreambuf_iterator<char>(file)),
-  //     (std::istreambuf_iterator<char>()));
   file.seekg(0, std::ios::end);
   size_t size (file.tellg());
   std::string content (size, ' ');
@@ -225,12 +223,12 @@ std::string M8::summary() const
 {
   std::stringstream ss; ss
   << "\nSummary\n"
-  << "  Total    " << macro_count_ << "\n"
-  << "  passes   " << pass_count_ << "\n"
-  << "  warnings " << warning_count_ << "\n"
-  << "  Internal " << internal_count_ << "\n"
-  << "  External " << external_count_ << "\n"
-  << "  Remote   " << remote_count_ << "\n";
+  << "  Total      " << stats.macro << "\n"
+  << "    Internal " << stats.internal << "\n"
+  << "    External " << stats.external << "\n"
+  << "    Remote   " << stats.remote << "\n"
+  << "  passes     " << stats.pass << "\n"
+  << "  warnings   " << stats.warning << "\n";
   return ss.str();
 }
 
@@ -251,6 +249,11 @@ std::vector<std::string> M8::suggest_macro(std::string const& name) const
       similar_names.emplace_back(similar_match[0]);
     }
   }
+
+  std::sort(similar_names.begin(), similar_names.end(),
+  [](std::string const& lhs, std::string const& rhs) {
+    return lhs.size() < rhs.size();
+  });
 
   return similar_names;
 }
@@ -415,6 +418,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
             {
               std::smatch match;
               std::string name_args {"^\\s*([^\\s]+)\\s*([^\\r]*?)\\s*$"};
+              // std::string name_args {"^\\s*([^\\s]+)\\s*(?:M8!|)([^\\r]*?)(?:!8M|$)$"};
               if (std::regex_match(t.str, match, std::regex(name_args)))
               {
                 t.name = match[1];
@@ -693,6 +697,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
               }
               else
               {
+                // TODO overload regex matches
                 std::smatch match;
                 if (std::regex_match(t.args, match, std::regex(it->second.regex)))
                 {
@@ -737,6 +742,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                   {
                     ec = run_external(it->second, ctx);
                   }
+                  ++stats.macro;
                 }
                 catch (std::exception const& e)
                 {
@@ -770,23 +776,34 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
 
                 if (t.res.find(delim_start_) != std::string::npos)
                 {
-                  {
-                    // remove all nl chars that follow delim_end
-                    // this would normally be removed by the reader
-                    size_t pos {0};
-                    for (;;)
-                    {
-                      pos = t.res.find(delim_end_ + "\n", pos);
-                      if (pos == std::string::npos) break;
-                      t.res.replace(pos, delim_end_.size() + 1, delim_end_);
-                      ++pos;
-                    }
-                  }
+                  // remove escaped nl chars
+                  t.res = String::replace_all(t.res, "\\\n", "");
+                  // {
+                  //   size_t pos {0};
+                  //   for (;;)
+                  //   {
+                  //     pos = t.res.find("\\\n", pos);
+                  //     if (pos == std::string::npos) break;
+                  //     t.res.erase(pos, 2);
+                  //     ++pos;
+                  //   }
+                  // }
 
-                  // std::cerr << "line:\n" << line << "\n\n";
+                  // remove all nl chars that follow delim_end
+                  // this would normally be removed by the reader
+                  t.res = String::replace_all(t.res, delim_end_ + "\n", delim_end_);
+                  // {
+                  //   size_t pos {0};
+                  //   for (;;)
+                  //   {
+                  //     pos = t.res.find(delim_end_ + "\n", pos);
+                  //     if (pos == std::string::npos) break;
+                  //     t.res.replace(pos, delim_end_.size() + 1, delim_end_);
+                  //     ++pos;
+                  //   }
+                  // }
+
                   line.insert(i + delim_end_.size(), t.res);
-                  // std::cerr << "res:\n" << t.res << "\n\n";
-                  // std::cerr << "line:\n" << line << "\n\n";
                   i += delim_end_.size() - 1;
                   continue;
                 }
@@ -904,7 +921,6 @@ regular_char:
   if (! stk.empty())
   {
     throw std::runtime_error("missing closing delimiter");
-    std::cerr << "Error: missing closing delimiter\n";
   }
 
   if (! _ofile.empty())
@@ -915,14 +931,14 @@ regular_char:
 
 int M8::run_internal(Macro const& macro, Ctx& ctx)
 {
-  ++internal_count_;
+  ++stats.internal;
 
   return macro.func(ctx);
 }
 
 int M8::run_external(Macro const& macro, Ctx& ctx)
 {
-  ++external_count_;
+  ++stats.external;
 
   std::string m_args;
   for (size_t i = 1; i < ctx.args.size(); ++i)
@@ -936,7 +952,7 @@ int M8::run_external(Macro const& macro, Ctx& ctx)
 
 int M8::run_remote(Macro const& macro, Ctx& ctx)
 {
-  ++remote_count_;
+  ++stats.remote;
 
   Http api;
   api.req.method = "POST";

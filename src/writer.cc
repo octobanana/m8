@@ -5,7 +5,6 @@
 #include <iostream>
 #include <fstream>
 
-#include <bitset>
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
 
@@ -23,7 +22,10 @@ Writer::~Writer()
 
 void Writer::open()
 {
-  file_.open(file_name_ + file_ext_);
+  fs::create_directory("./.m8/swp/");
+  fs::path fp {file_name_};
+  fs::path p {"./.m8/swp/" + std::string(fp.filename()) + file_ext_};
+  file_.open(p);
   if (! file_.is_open())
   {
     throw std::runtime_error("could not open the output file");
@@ -41,7 +43,10 @@ void Writer::close()
   {
     file_.close();
   }
-  fs::rename(file_name_ + file_ext_, file_name_);
+  fs::path fp {file_name_};
+  fs::path p1 {"./.m8/swp/" + std::string(fp.filename()) + file_ext_};
+  fs::path p2 {file_name_};
+  fs::rename(p1, p2);
 }
 
 } // namespace OB

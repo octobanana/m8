@@ -14,7 +14,8 @@ int start_m8(Parg& pg);
 
 int program_options(Parg& pg)
 {
-  pg.name("m8").version("0.4.0 (29.03.2018)");
+  pg.name("m8").version("0.5.1 (10.04.2018)");
+
   pg.description("a meta programming tool");
   pg.usage("[flags] [options] [--] [arguments]");
   pg.usage("[-f 'input_file'] [-o 'output_file'] [-c 'config file'] [-s 'start_delim'] [-e 'end_delim'] [d]");
@@ -22,12 +23,12 @@ int program_options(Parg& pg)
   pg.usage("[-h|--help]");
   pg.info("Exit Codes", {"0 -> normal", "1 -> error"});
   pg.info("Examples", {
-    "m8 -f input_file -o ouput_file",
-    "m8 -f input_file -o ouput_file -c ~/custom_path/.m8",
-    "m8 -f input_file -o ouput_file -s '[[' -e ']]'",
-    "m8 --list",
-    "m8 --help",
-    "m8 --version",
+    pg.name() + "-f input_file -o ouput_file",
+    pg.name() + "-f input_file -o ouput_file -c ~/custom_path/.m8",
+    pg.name() + "-f input_file -o ouput_file -s '[[' -e ']]'",
+    pg.name() + "--list",
+    pg.name() + "--help",
+    pg.name() + "--version",
   });
   pg.author("Brett Robinson (octobanana) <octobanana.dev@gmail.com>");
 
@@ -40,6 +41,7 @@ int program_options(Parg& pg)
   pg.set("debug,d", "print out debug information, useful for debugging macro regexes");
   pg.set("interpreter,i", "start the interpreter in readline mode");
   pg.set("no-copy", "do not copy outside text");
+  pg.set("summary", "print out summary at end");
 
   // singular options
   pg.set("info", "", "str", "view informatin on specific macro");
@@ -59,24 +61,24 @@ int program_options(Parg& pg)
   // uncomment if at least one argument is expected
   if (status > 0 && pg.get_stdin().empty())
   {
-    std::cout << pg.print_help() << "\n";
+    std::cout << pg.help() << "\n";
     std::cout << "Error: " << "expected arguments" << "\n";
     return -1;
   }
   if (status < 0)
   {
-    std::cout << pg.print_help() << "\n";
+    std::cout << pg.help() << "\n";
     std::cout << "Error: " << pg.error() << "\n";
     return -1;
   }
   if (pg.get<bool>("help"))
   {
-    std::cout << pg.print_help();
+    std::cout << pg.help();
     return 1;
   }
   if (pg.get<bool>("version"))
   {
-    std::cout << pg.print_version();
+    std::cout << pg.name() << " v" << pg.version() << "\n";
     return 1;
   }
   return 0;
@@ -119,6 +121,7 @@ int start_m8(Parg& pg)
       return 0;
     }
 
+
     // set debug option
     m8.set_debug(pg.get<bool>("debug"));
 
@@ -156,7 +159,11 @@ int start_m8(Parg& pg)
     m8.parse(pg.get("file"), pg.get("output"));
 
     // print out summary
-    // std::cerr << m8.summary();
+    if (pg.get<bool>("summary"))
+    {
+      std::cerr << m8.summary();
+    }
+
     return 0;
   }
   catch (std::exception const& e)

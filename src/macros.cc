@@ -4,6 +4,9 @@
 #include "http.hh"
 #include "crypto.hh"
 
+#include "parg.hh"
+using Parg = OB::Parg;
+
 #include "string.hh"
 namespace String = OB::String;
 
@@ -52,12 +55,26 @@ namespace Macros
 
 
 // variables
-
-// shared database for key value pairs
 var db = std::map<std::string, std::string>();
-
 std::string m8_delim_start;
 std::string m8_delim_end;
+
+// helper functions
+
+int ftostr(std::string f, std::string& s);
+
+int ftostr(std::string f, std::string& s)
+{
+  std::ifstream file {f};
+  if (! file.is_open()) return -1;
+  file.seekg(0, std::ios::end);
+  size_t size (file.tellg());
+  std::string content (size, ' ');
+  file.seekg(0);
+  file.read(&content[0], size);
+  s = content;
+  return 0;
+}
 
 // macro functions
 
@@ -148,8 +165,15 @@ auto const fn_file = [](auto& ctx) {
 };
 
 auto const fn_env = [](auto& ctx) {
-  std::string str {std::getenv(ctx.args.at(1).c_str())};
-  ctx.str = str;
+  const char *e = std::getenv(ctx.args.at(1).c_str());
+  if (e)
+  {
+    ctx.str = e;
+  }
+  else
+  {
+    ctx.str = "0";
+  }
   return 0;
 };
 
@@ -382,7 +406,7 @@ auto const fn_set = [&](auto& ctx) {
     ss << ctx.args.at(i);
   }
   str = ss.str();
-  str = String::unescape(str);
+  // str = String::unescape(str);
 
   db[key] = str;
   return 0;
@@ -439,6 +463,102 @@ void macros(M8& m8)
   //   return 0;
   //   });
 
+  m8.set_macro("test::parg",
+    "",
+    "",
+    "^([^\\r]*)$",
+    [&](auto& ctx) {
+    auto str = ctx.args.at(1);
+
+    Parg pg;
+    pg.set("version,v", "print the program version");
+    pg.set("file,f", "default.txt", "file", "set the input file");
+    int status {pg.parse(str)};
+
+    std::cout << "flag: version: " << pg.get<std::string>("version") << "\n";
+    std::cout << "option: file: " << pg.get("file") << "\n";
+
+    return 0;
+    });
+
+  m8.set_macro("cpp::enum",
+    "",
+    "",
+    "^([^\\r]+)$",
+    [&](auto& ctx) {
+    var str = ctx.args.at(1);
+    std::stringstream ss;
+    ss.str(str);
+
+    std::string name;
+    ss >> name;
+
+    std::vector<std::string> ve;
+    std::string elem;
+    while (ss >> elem)
+    {
+      ve.emplace_back(elem);
+    }
+
+    auto const list_enum = [&ve]() {
+      std::string s;
+      if (ve.size() > 1)
+      {
+        for (size_t i = 0; i < ve.size() - 1; ++i)
+        {
+          s += ve.at(i) + ", ";
+        }
+      }
+      s += ve.back();
+      return s;
+    };
+
+    auto const str_enum = [&ve]() {
+      std::string s;
+      if (ve.size() > 1)
+      {
+        for (auto const& e : ve)
+        {
+          s += "case " + e + ": return \"" + e +  "\";";
+        }
+      }
+      return s;
+    };
+
+    std::stringstream res;
+    res
+    << "struct " << name
+    << " { enum en { " << list_enum() << " } e; "
+    << "std::string s() const { switch (e) { " << str_enum()
+    << " default: return {}; } } "
+    << name + "& operator=(" << name << "::en rhs) { std::swap(e, rhs); return *this; }"
+    << " };"
+    // << "friend std::ostream& operator<<(std::ostream& os, const " << name << "& obj); }; "
+    // << "inline bool operator==(" << name << " const& lhs, "<< name << " const& rhs) { return lhs == rhs; }; "
+    // << "std::ostream& operator<<(std::ostream& os, " << name << " const& obj) { os << obj.s(); return os; }"
+    << "\n";
+
+    ctx.str = res.str();
+    return 0;
+    });
+
+  m8.set_macro("version",
+    "",
+    "",
+    "",
+    [&](auto& ctx) {
+    auto name = ctx.args.at(1);
+    std::string str;
+    if (ftostr(name, str) != 0) return -1;
+    auto num = std::stoi(str);
+    ++num;
+    ctx.str = std::to_string(num);
+    std::ofstream ofile {name};
+    if (! ofile.is_open()) return -1;
+    ofile << num;
+    return 0;
+    });
+
   m8.set_macro("eq",
     "",
     "",
@@ -452,6 +572,23 @@ void macros(M8& m8)
       res = "1";
     }
     ctx.str = res;
+    return 0;
+    });
+
+  m8.set_macro("M8::IF",
+    "",
+    "",
+    R"(^([01]{1})([^\r]*)M8::ELSE\n([^\r]*)M8::END$)",
+    [&](auto& ctx) {
+    var cond = std::stoi(ctx.args.at(1));
+    if (cond)
+    {
+      ctx.str = ctx.args.at(2);
+    }
+    else
+    {
+      ctx.str = ctx.args.at(3);
+    }
     return 0;
     });
 
@@ -513,7 +650,7 @@ void macros(M8& m8)
   m8.set_macro("def",
     "define a macro",
     "def <key> <val>",
-    "^(.+?)\\s+(?:M8\\!|)([^\\r]+?)(?:\\!8M|$)",
+    "^(.+?)\\s+(?:M8!|)([^\\r]+?)(?:!8M|$)",
     [&](auto& ctx) {
     var name = ctx.args.at(1);
     var delim_start = m8_delim_start;
@@ -528,39 +665,13 @@ void macros(M8& m8)
       {
         auto pos = ctx.args.at(i).find(":");
         if (pos == std::string::npos) continue;
-        auto name = ctx.args.at(i).substr(0, pos);
+        auto key = ctx.args.at(i).substr(0, pos);
         auto str = ctx.args.at(i).substr(pos + 1);
-        arg_map[name] = str;
+        arg_map[key] = str;
       }
 
-      if (! arg_map.empty())
-      {
-        size_t pos {0};
-        std::smatch match;
-        std::regex rx {"\\{(\\w+)(?:(:\\d\\.\\d.?)?)\\}"};
-        std::string str {tmp};
-
-        while (std::regex_search(str, match, rx))
-        {
-          std::string m {match[0]};
-          std::string first {match[1]};
-
-          pos += std::string(match.prefix()).size();
-
-          if (arg_map.find(first) == arg_map.end())
-          {
-            pos += m.size();
-            str = str.substr(m.size());
-            continue;
-          }
-
-          tmp.replace(pos, m.size(), arg_map[first]);
-          pos += arg_map[first].size();
-          str = match.suffix();
-        }
-      }
-
-      // unescape_str(tmp);
+      tmp = String::xformat(tmp, arg_map);
+      tmp = String::unescape(tmp);
       tmp = String::replace_first(tmp, "`" + delim_start, delim_start);
       tmp = String::replace_last(tmp, delim_end + "`", delim_end);
       ctx.str = tmp;
@@ -584,8 +695,8 @@ void macros(M8& m8)
     "^([^\\r]+)$",
     [&](auto& ctx) {
     // check cache for value
-    var ckey = Crypto::sha256(ctx.args.at(0));
-    if (ctx.cache.get(ckey, ctx.str)) return 0;
+    // var ckey = Crypto::sha256(ctx.args.at(0));
+    // if (ctx.cache.get(ckey, ctx.str)) return 0;
 
     var flags = std::string();
     if (db.find("c-flags") != db.end())
@@ -617,7 +728,7 @@ void macros(M8& m8)
     fs::remove(fs::path(".m8/.m8-c.c"));
 
     // add new value to cache
-    ctx.cache.set(ckey, ctx.str);
+    // ctx.cache.set(ckey, ctx.str);
 
     return 0;
     });
@@ -628,8 +739,8 @@ void macros(M8& m8)
     "^([^\\r]+)$",
     [&](auto& ctx) {
     // check cache for value
-    var ckey = Crypto::sha256(ctx.args.at(0));
-    if (ctx.cache.get(ckey, ctx.str)) return 0;
+    // var ckey = Crypto::sha256(ctx.args.at(0));
+    // if (ctx.cache.get(ckey, ctx.str)) return 0;
 
     var flags = std::string();
     if (db.find("cpp-flags") != db.end())
@@ -661,7 +772,7 @@ void macros(M8& m8)
     fs::remove(fs::path(".m8/.m8-cpp.cc"));
 
     // add new value to cache
-    ctx.cache.set(ckey, ctx.str);
+    // ctx.cache.set(ckey, ctx.str);
 
     return 0;
     });
@@ -672,8 +783,8 @@ void macros(M8& m8)
     "^([^\\r]+)$",
     [&](auto& ctx) {
     // check cache for value
-    var ckey = Crypto::sha256(ctx.args.at(0));
-    if (ctx.cache.get(ckey, ctx.str)) return 0;
+    // var ckey = Crypto::sha256(ctx.args.at(0));
+    // if (ctx.cache.get(ckey, ctx.str)) return 0;
 
     var str = ctx.args.at(1);
     let path = std::string(".m8/.m8-script.tmp.m8");
@@ -685,7 +796,7 @@ void macros(M8& m8)
     fs::remove(fs::path(path));
 
     // add new value to cache
-    ctx.cache.set(ckey, ctx.str);
+    // ctx.cache.set(ckey, ctx.str);
 
     return status;
     });
@@ -696,8 +807,8 @@ void macros(M8& m8)
     "",
     [&](auto& ctx) {
     // check cache for value
-    var ckey = Crypto::sha256(ctx.args.at(0));
-    if (ctx.cache.get(ckey, ctx.str)) return 0;
+    // var ckey = Crypto::sha256(ctx.args.at(0));
+    // if (ctx.cache.get(ckey, ctx.str)) return 0;
 
     var version = ctx.args.at(1);
     var name = ctx.args.at(2);
@@ -712,7 +823,7 @@ void macros(M8& m8)
     ctx.str = api.res.body;
 
     // add new value to cache
-    ctx.cache.set(ckey, ctx.str);
+    // ctx.cache.set(ckey, ctx.str);
 
     return 0;
     });
@@ -769,13 +880,14 @@ void macros(M8& m8)
   m8.set_macro("get",
     "get value of key from db",
     "get <key>",
-    "^\"(.+)\"$",
+    "^(.+)$",
     fn_get);
 
   m8.set_macro("set",
     "set key to value in db",
     "set <key> <val>",
-    "^\"(.+?)\"\\s+([^\\r]+)$",
+    // "^\"(.+?)\"\\s+([^\\r]+)$",
+    "^(.+?)\\s+(?:M8!|)([^\\r]+?)(?:!8M|$)",
     fn_set);
 
   m8.set_macro("http-get",

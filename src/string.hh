@@ -21,6 +21,9 @@ fn repeat(std::string const& str, size_t num)
 fn count(std::string const& str, std::string const& val)
 -> size_t;
 
+fn escape(std::string str)
+-> std::string;
+
 fn unescape(std::string str)
 -> std::string;
 
@@ -39,7 +42,10 @@ fn delimit(std::string const& str, std::string const& delim)
 fn delimit_first(std::string const& str, std::string const& delim)
 -> std::vector<std::string>;
 
-fn format(std::string str, std::string const& key, std::map<std::string, std::string>& args)
+fn format(std::string str, std::map<std::string, std::string> args)
+-> std::string;
+
+fn xformat(std::string str, std::map<std::string, std::string> args)
 -> std::string;
 
 } // namespace String

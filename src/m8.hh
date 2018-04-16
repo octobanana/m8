@@ -31,6 +31,7 @@ public:
     std::string& str;
     Args const& args;
     Cache& cache;
+    size_t indent {0};
   }; // struct Ctx
 
   using macro_fn = std::function<int(Ctx& ctx)>;
@@ -61,20 +62,25 @@ public:
   void parse(std::string const& _ifile, std::string const& _ofile);
 
 private:
-  // general stats
-  int macro_count_ {0};
-  int warning_count_ {0};
-  int pass_count_ {0};
+  struct Stats
+  {
+    // general stats
+    int macro {0};
+    int warning {0};
+    int pass {0};
 
-  // macro stats
-  int internal_count_ {0};
-  int external_count_ {0};
-  int remote_count_ {0};
+    // macro stats
+    int internal {0};
+    int external {0};
+    int remote {0};
+  }; // struct Stats
+  Stats stats;
 
   bool readline_ {false};
   bool use_stdout_ {false};
   bool debug_ {false};
   bool copy_ {false};
+  bool summary_ {false};
 
   std::string delim_start_ {"[M8["};
   std::string delim_end_ {"]8M]"};

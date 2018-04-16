@@ -22,6 +22,9 @@
 // SOFTWARE.
 //
 
+#ifndef OB_PARG_HH
+#define OB_PARG_HH
+
 #include <cstdlib>
 #include <cassert>
 #include <sstream>
@@ -32,158 +35,16 @@
 #include <string>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <streambuf>
-#include <iomanip>
 
 namespace OB
 {
 class Parg
 {
-private:
-  class Term
-  {
-  public:
-    static size_t height()
-    {
-      struct winsize w;
-      ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-      return w.ws_row;
-    }
-
-    static size_t width()
-    {
-      struct winsize w;
-      ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-      return w.ws_col;
-    }
-
-    static void size(size_t &width, size_t &height)
-    {
-      struct winsize w;
-      ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-      width = w.ws_col;
-      height = w.ws_row;
-    }
-  }; // class Term
-
-  class Widthbuf: public std::streambuf
-  {
-  public:
-    Widthbuf(size_t w, std::streambuf* s):
-      indent_width {0},
-      def_width {w},
-      width {w},
-      sbuf {s},
-      count {0}
-    {
-    }
-
-    ~Widthbuf()
-    {
-      overflow('\n');
-    }
-
-    void set_indent(size_t w)
-    {
-      if (w == 0)
-      {
-        prefix.clear();
-        indent_width = 0;
-        width = def_width;
-      }
-      else
-      {
-        indent_width += w;
-        prefix = std::string(indent_width, ' ');
-        width -= w;
-      }
-    }
-
-  private:
-    using string = std::basic_string<char_type>;
-
-    int_type overflow(int_type c)
-    {
-      if (traits_type::eq_int_type(traits_type::eof(), c))
-      {
-        return traits_type::not_eof(c);
-      }
-
-      switch (c)
-      {
-        case '\n':
-        case '\r':
-        {
-          buffer += c;
-          count = 0;
-          sbuf->sputn(prefix.c_str(), static_cast<std::streamsize>(indent_width));
-          int_type rc = sbuf->sputn(buffer.c_str(), static_cast<std::streamsize>(buffer.size()));
-          buffer.clear();
-          return rc;
-        }
-        case '\a':
-          return sbuf->sputc(c);
-        case '\t':
-          buffer += c;
-          count += tab_width - count % tab_width;
-          return c;
-        default:
-          if (count >= width)
-          {
-            size_t wpos = buffer.find_last_of(" \t");
-            if (wpos != string::npos)
-            {
-              sbuf->sputn(prefix.c_str(), static_cast<std::streamsize>(indent_width));
-              sbuf->sputn(buffer.c_str(), static_cast<std::streamsize>(wpos));
-              count = buffer.size()-wpos-1;
-              buffer = string(buffer, wpos+1);
-            }
-            else
-            {
-              sbuf->sputn(prefix.c_str(), static_cast<std::streamsize>(indent_width));
-              sbuf->sputn(buffer.c_str(), static_cast<std::streamsize>(buffer.size()));
-              buffer.clear();
-              count = 0;
-            }
-            sbuf->sputc('\n');
-          }
-          buffer += c;
-          ++count;
-          return c;
-      }
-    }
-
-    size_t indent_width;
-    size_t def_width;
-    size_t width;
-    std::streambuf* sbuf;
-    size_t count;
-    size_t tab_count;
-    static const int tab_width {4};
-    std::string prefix;
-    string buffer;
-  }; // class widthbuf
-
-  class Widthstream : public std::ostream
-  {
-  public:
-    Widthstream(size_t width, std::ostream &os):
-      std::ostream {&buf},
-      buf {width, os.rdbuf()}
-    {
-    }
-
-    Widthstream& indent(size_t w)
-    {
-      buf.set_indent(w);
-      return *this;
-    }
-
-  private:
-    Widthbuf buf;
-  }; // class Widthstream
-
 public:
+  Parg()
+  {
+  }
+
   Parg(int _argc, char** _argv):
     argc_ {_argc}
   {
@@ -196,10 +57,20 @@ public:
     return *this;
   }
 
+  std::string name() const
+  {
+    return name_;
+  }
+
   Parg& version(std::string const _version)
   {
     version_ = _version;
     return *this;
+  }
+
+  std::string version() const
+  {
+    return version_;
   }
 
   Parg& usage(std::string const _usage)
@@ -208,10 +79,20 @@ public:
     return *this;
   }
 
+  std::string usage() const
+  {
+    return usage_;
+  }
+
   Parg& description(std::string const _description)
   {
     description_ = _description;
     return *this;
+  }
+
+  std::string description() const
+  {
+    return description_;
   }
 
   Parg& info(std::string const _title, std::vector<std::string> const _text)
@@ -226,31 +107,19 @@ public:
     return *this;
   }
 
-  std::string print_name() const
+  std::string author() const
   {
-    return name_;
+    return author_;
   }
 
-  std::string print_version() const
+  std::string help() const
   {
-    return name_ + " v" + version_ + "\n";
-  }
-
-  std::string print_usage() const
-  {
-    return usage_;
-  }
-
-  std::string print_help() const
-  {
-    auto width {Term::width()};
     std::stringstream out;
     if (! description_.empty())
     {
       out << name_ << ":" << "\n";
       std::stringstream ss;
-      Widthstream wout {width, ss};
-      wout.indent(2) << description_ << "\n";
+      out << "  " << description_ << "\n";
       out << ss.str() << "\n";
     }
 
@@ -280,8 +149,7 @@ public:
 
         for (auto const& t : e.text)
         {
-          Widthstream wout {width, out};
-          wout.indent(2) << t;
+          out << "  " << t << "\n";
         }
       }
     }
@@ -290,8 +158,7 @@ public:
     {
       out << "\nAuthor: " << "\n";
       std::stringstream ss;
-      Widthstream wout {width, ss};
-      wout.indent(2) << author_ << "\n";
+      ss << "  " << author_ << "\n";
       out << ss.str();
     }
 
@@ -308,12 +175,100 @@ public:
     return status_;
   }
 
+  int parse(std::string str)
+  {
+    auto args = str_to_args(str);
+    status_ = parse_args(args.size(), args);
+    return status_;
+  }
+
+  std::vector<std::string> str_to_args(std::string const& str)
+  {
+    std::vector<std::string> args;
+
+    // parse str into arg vector as if it was parsed by the shell
+    for (size_t i = 0; i < str.size(); ++i)
+    {
+      std::string e {str.at(i)};
+
+      // default
+      if (e.find_first_not_of(" \n\t\"'") != std::string::npos)
+      {
+        size_t start {i};
+        args.emplace_back("");
+        for (;i < str.size(); ++i)
+        {
+          e = str.at(i);
+          if (e.find_first_of(" \n\t") != std::string::npos)
+          {
+            --i; // put back unmatched char
+            args.back() += str.substr(start, i);
+            break;
+          }
+          // args.back() += str.at(i);
+        }
+        continue;
+      }
+
+      // whitespace
+      else if (e.find_first_of(" \n\t") != std::string::npos)
+      {
+        for (;i < str.size(); ++i)
+        {
+          e = str.at(i);
+          if (e.find_first_not_of(" \n\t") != std::string::npos)
+          {
+            --i; // put back unmatched char
+            break;
+          }
+        }
+        continue;
+      }
+
+      // string
+      else if (e.find_first_of("\"'") != std::string::npos)
+      {
+        std::string quote {e};
+        std::string backslash {"\\"};
+        bool escaped {false};
+        ++i; // skip start quote
+        args.emplace_back("");
+        size_t start {i};
+        for (;i < str.size(); ++i)
+        {
+          e = str.at(i);
+          if (! escaped && e == quote)
+          {
+            // skip end quote
+            args.back() += str.substr(start, i - 1);
+            break;
+          }
+          else if (e == backslash)
+          {
+            escaped = true;
+          }
+          else if (escaped)
+          {
+            // args.back() += backslash + e;
+            escaped = false;
+          }
+          // else
+          // {
+          //   args.back() += e;
+          // }
+        }
+      }
+    }
+    return args;
+  }
+
   void set(std::string _name, std::string _info)
   {
     // sets a flag
     std::string delim {","};
     if (_name.find(delim) != std::string::npos)
     {
+      // short and long
       bool has_short {false};
       std::string _long;
       std::string _short;
@@ -339,15 +294,28 @@ public:
     }
     else
     {
-      data_[_name].long_ = _name;
-      data_[_name].mode_ = true;
-      data_[_name].value_ = "0";
-      modes_.append("  --" + _name + "\n");
+      if (_name.size() == 1)
+      {
+        // short
+        flags_[_name] = _name;
+        data_[_name].long_ = _name;
+        data_[_name].short_ = _name;
+        data_[_name].mode_ = true;
+        data_[_name].value_ = "0";
+        modes_.append("  -" + _name + "\n");
+      }
+      else
+      {
+        // long
+        data_[_name].long_ = _name;
+        data_[_name].mode_ = true;
+        data_[_name].value_ = "0";
+        modes_.append("  --" + _name + "\n");
+      }
     }
 
     std::stringstream out;
-    Widthstream wout {Term::width(), out};
-    wout.indent(4) << _info << "\n";
+    out << "    " << _info << "\n";
     modes_.append(out.str());
   }
 
@@ -382,21 +350,38 @@ public:
     }
     else
     {
-      data_[_name].long_ = _name;
-      data_[_name].mode_ = false;
-      data_[_name].value_ = _default;
-      options_.append("  --" + _name + "=<" + _arg + ">\n");
+      if (_name.size() == 1)
+      {
+        // short
+        flags_[_name] = _name;
+        data_[_name].long_ = _name;
+        data_[_name].short_ = _name;
+        data_[_name].mode_ = false;
+        data_[_name].value_ = _default;
+        options_.append("  -" + _name + "=<" + _arg + ">\n");
+      }
+      else
+      {
+        // long
+        data_[_name].long_ = _name;
+        data_[_name].mode_ = false;
+        data_[_name].value_ = _default;
+        options_.append("  --" + _name + "=<" + _arg + ">\n");
+      }
     }
 
     std::stringstream out;
-    Widthstream wout {Term::width(), out};
-    wout.indent(4) << _info << "\n";
+    out << "    " << _info << "\n";
     options_.append(out.str());
   }
 
   template<class T>
   T get(std::string const _key)
   {
+    if (data_.find(_key) == data_.end())
+    {
+      throw std::logic_error("parg get '" + _key + "' is not defined");
+    }
     std::stringstream ss;
     ss << data_[_key].value_;
     T val;
@@ -406,13 +391,17 @@ public:
 
   std::string get(std::string const _key)
   {
+    if (data_.find(_key) == data_.end())
+    {
+      throw std::logic_error("parg get '" + _key + "' is not defined");
+    }
     return data_[_key].value_;
   }
 
   bool find(std::string const _key) const
   {
     // key must exist
-    assert(data_.find(_key) != data_.end());
+    if (data_.find(_key) == data_.end()) return false;
     return data_.at(_key).seen_;
   }
 
@@ -480,20 +469,19 @@ private:
   bool is_positional_ {false};
   std::string positional_;
   std::string stdin_;
-  bool is_stdin_;
+  bool is_stdin_ {false};
   int status_ {0};
   std::string error_;
 
   void argvf(char** _argv)
   {
-    // std::cout << "argc: " << argc_ << std::endl;
     // removes first arg
     if (argc_ < 1) return;
     for (int i = 1; i < argc_; ++i)
     {
       argv_.emplace_back(_argv[i]);
-      // std::cout << "argv: " << i << " -> " << argv_.at(i) << std::endl;
     }
+    // std::cerr << "argv: " << i << " -> " << argv_.at(i) << std::endl;
     --argc_;
   }
 
@@ -512,8 +500,8 @@ private:
   std::vector<std::string> delimit(const std::string str, const std::string delim) const
   {
     std::vector<std::string> vtok;
-    auto start = 0U;
-    auto end = str.find(delim);
+    size_t start {0};
+    size_t end = str.find(delim);
     while (end != std::string::npos) {
       vtok.emplace_back(str.substr(start, end - start));
       start = end + delim.length();
@@ -533,7 +521,7 @@ private:
     for (int i = 0; i < _argc; ++i)
     {
       std::string const& tmp {_argv.at(static_cast<size_t>(i))};
-      // std::cout << "ARG: " << i << " -> " << tmp << std::endl;
+      // std::cerr << "ARG: " << i << " -> " << tmp << std::endl;
 
       if (dashdash)
       {
@@ -551,13 +539,13 @@ private:
       if (tmp.size() > 1 && tmp.at(0) == '-' && tmp.at(1) != '-')
       {
         // short
-        // std::cout << "SHORT: " << tmp << std::endl;
+        // std::cerr << "SHORT: " << tmp << std::endl;
 
         std::string c {tmp.at(1)};
         if (flags_.find(c) != flags_.end() && !(data_.at(flags_.at(c)).mode_))
         {
           // short arg
-          // std::cout << "SHORT: arg -> " << c << std::endl;
+          // std::cerr << "SHORT: arg -> " << c << std::endl;
 
           if (data_.at(flags_.at(c)).seen_)
           {
@@ -598,7 +586,7 @@ private:
 
             if (flags_.find(s) != flags_.end() && data_.at(flags_.at(s)).mode_)
             {
-              // std::cout << "SHORT: mode -> " << c << std::endl;
+              // std::cerr << "SHORT: mode -> " << s << std::endl;
 
               if (data_.at(flags_.at(s)).seen_)
               {
@@ -622,7 +610,7 @@ private:
       else if (tmp.size() > 2 && tmp.at(0) == '-' && tmp.at(1) == '-')
       {
         // long || --
-        // std::cout << "LONG: " << tmp << std::endl;
+        // std::cerr << "LONG: " << tmp << std::endl;
         std::string c {tmp.substr(2, tmp.size() - 1)};
         std::string a;
 
@@ -644,13 +632,13 @@ private:
 
           if (data_.at(c).mode_ && a.size() == 0)
           {
-            // std::cout << "LONG: mode -> " << c << std::endl;
+            // std::cerr << "LONG: mode -> " << c << std::endl;
             data_.at(c).value_ = "1";
             data_.at(c).seen_ = true;
           }
           else
           {
-            // std::cout << "LONG: arg -> " << c << std::endl;
+            // std::cerr << "LONG: arg -> " << c << std::endl;
             if (a.size() > 0)
             {
               data_.at(c).value_ = a;
@@ -680,7 +668,7 @@ private:
       else if (tmp.size() > 0 && is_positional_)
       {
         // positional
-        // std::cout << "POS: " << tmp << std::endl;
+        // std::cerr << "POS: " << tmp << std::endl;
         if (tmp == "--")
         {
           dashdash = true;
@@ -709,3 +697,5 @@ private:
   }
 }; // class Parg
 } // namespace OB
+
+#endif // OB_PARG_HH

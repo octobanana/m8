@@ -39,6 +39,7 @@ set (SOURCES
   src/http.cc
   src/crypto.cc
   src/string.cc
+  src/ansi_escape_codes.cc
 )
 
 set (HEADERS

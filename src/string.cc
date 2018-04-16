@@ -45,6 +45,62 @@ fn count(std::string const& str, std::string const& val)
   return count;
 }
 
+fn escape(std::string str)
+-> std::string
+{
+  var pos = size_t(0);
+  for (;; ++pos)
+  {
+    pos = str.find_first_of("\n\t\r\a\b\f\v\\\"\'\?", pos);
+    if (pos == std::string::npos) break;
+    if (str.at(pos) == '\n')
+    {
+      str.replace(pos, 1, "\\\n");
+    }
+    else if (str.at(pos) == '\t')
+    {
+      str.replace(pos, 1, "\\\t");
+    }
+    else if (str.at(pos) == '\r')
+    {
+      str.replace(pos, 1, "\\\r");
+    }
+    else if (str.at(pos) == '\a')
+    {
+      str.replace(pos, 1, "\\\a");
+    }
+    else if (str.at(pos) == '\b')
+    {
+      str.replace(pos, 1, "\\\b");
+    }
+    else if (str.at(pos) == '\f')
+    {
+      str.replace(pos, 1, "\\\f");
+    }
+    else if (str.at(pos) == '\v')
+    {
+      str.replace(pos, 1, "\\\v");
+    }
+    else if (str.at(pos) == '\\')
+    {
+      str.replace(pos, 1, "\\\\");
+    }
+    else if (str.at(pos) == '\"')
+    {
+      str.replace(pos, 1, "\\\"");
+    }
+    else if (str.at(pos) == '\'')
+    {
+      str.replace(pos, 1, "\\'");
+    }
+    else if (str.at(pos) == '\?')
+    {
+      str.replace(pos, 1, "\\\?");
+    }
+  }
+  return str;
+}
+
 fn unescape(std::string str)
 -> std::string
 {
@@ -165,7 +221,7 @@ fn delimit_first(std::string const& str, std::string const& delim)
   return vtok;
 }
 
-fn format(std::string str, std::string const& key, std::map<std::string, std::string>& args)
+fn format(std::string str, std::map<std::string, std::string> args)
 -> std::string
 {
   if (args.empty())
@@ -176,9 +232,9 @@ fn format(std::string str, std::string const& key, std::map<std::string, std::st
   var res = str;
   var pos = size_t(0);
   var match = std::smatch();
-  let rx = std::regex("\\{(\\w+)(?:(:\\d\\.\\d.?)?)\\}");
+  let rx = std::regex("\\{(\\w+)(?:(:[^\\r]*?)?)\\}");
 
-  while (std::regex_search(str, match, rx))
+  while (std::regex_search(res, match, rx))
   {
     var m = std::string(match[0]);
     var first = std::string(match[1]);
@@ -187,7 +243,7 @@ fn format(std::string str, std::string const& key, std::map<std::string, std::st
     if (args.find(first) == args.end())
     {
       pos += m.size();
-      res = res.substr(m.size());
+      res = match.suffix();
       continue;
     }
 
@@ -196,7 +252,81 @@ fn format(std::string str, std::string const& key, std::map<std::string, std::st
     res = match.suffix();
   }
 
-  return res;
+  return str;
+}
+
+fn xformat(std::string str, std::map<std::string, std::string> args)
+-> std::string
+{
+  if (args.empty())
+  {
+    return str;
+  }
+
+  var res = str;
+  var pos = size_t(0);
+  var match = std::smatch();
+  let rx = std::regex("\\{(\\w+)(?:(:[^\\r]*?:\\1)?)\\}");
+
+  while (std::regex_search(res, match, rx))
+  {
+    bool is_simple {true};
+    var m = std::string(match[0]);
+    var first = std::string(match[1]);
+    var second = std::string(match[2]);
+    pos += std::string(match.prefix()).size();
+
+    if (second.size() > 0)
+    {
+      is_simple = false;
+    }
+
+    if (args.find(first) == args.end())
+    {
+      pos += m.size();
+      res = match.suffix();
+      continue;
+    }
+
+    if (is_simple)
+    {
+      str.replace(pos, m.size(), args[first]);
+      pos += args[first].size();
+      res = match.suffix();
+    }
+    else
+    {
+      std::smatch match_complex;
+      std::regex rx {"^:([*]{1})(.+)([a-z0-9]{1}):([^\\r]+):" + first + "$"};
+      if (std::regex_match(second, match_complex, rx))
+      {
+        std::string type {match_complex[1]};
+        std::string delim {match_complex[2]};
+        std::string index_char {match_complex[3]};
+        std::string rstr {match_complex[4]};
+
+        auto vec = String::delimit(args[first], delim);
+        std::stringstream ss;
+
+        for (auto const& e : vec)
+        {
+          ss << String::replace_all(rstr, "[" + index_char + "]", e);
+        }
+
+        auto nstr = String::xformat(ss.str(), args);
+        str.replace(pos, m.size(), nstr);
+        pos += nstr.size();
+        res = match.suffix();
+      }
+      else
+      {
+        pos += m.size();
+        res = match.suffix();
+      }
+    }
+  }
+
+  return str;
 }
 
 } // namespace String
