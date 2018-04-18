@@ -45,9 +45,9 @@ public:
   {
   }
 
-  Parg(int _argc, char** _argv):
-    argc_ {_argc}
+  Parg(int _argc, char** _argv)
   {
+    argc_ = _argc;
     argvf(_argv);
   }
 
@@ -175,6 +175,18 @@ public:
     return status_;
   }
 
+  int parse(int argc, char** argv)
+  {
+    if (is_stdin_)
+    {
+      pipe_stdin();
+    }
+    argc_ = argc;
+    argvf(argv);
+    status_ = parse_args(argc_, argv_);
+    return status_;
+  }
+
   int parse(std::string str)
   {
     auto args = str_to_args(str);
@@ -186,6 +198,8 @@ public:
   {
     std::vector<std::string> args;
 
+    std::string const backslash {"\\"};
+
     // parse str into arg vector as if it was parsed by the shell
     for (size_t i = 0; i < str.size(); ++i)
     {
@@ -194,18 +208,30 @@ public:
       // default
       if (e.find_first_not_of(" \n\t\"'") != std::string::npos)
       {
+        bool escaped {false};
         size_t start {i};
         args.emplace_back("");
         for (;i < str.size(); ++i)
         {
           e = str.at(i);
-          if (e.find_first_of(" \n\t") != std::string::npos)
+          if (! escaped && e.find_first_of(" \n\t") != std::string::npos)
           {
             --i; // put back unmatched char
-            args.back() += str.substr(start, i);
             break;
           }
-          // args.back() += str.at(i);
+          else if (e == backslash)
+          {
+            escaped = true;
+          }
+          else if (escaped)
+          {
+            args.back() += e;
+            escaped = false;
+          }
+          else
+          {
+            args.back() += e;
+          }
         }
         continue;
       }
@@ -229,7 +255,6 @@ public:
       else if (e.find_first_of("\"'") != std::string::npos)
       {
         std::string quote {e};
-        std::string backslash {"\\"};
         bool escaped {false};
         ++i; // skip start quote
         args.emplace_back("");
@@ -239,9 +264,8 @@ public:
           e = str.at(i);
           if (! escaped && e == quote)
           {
-            // skip end quote
-            args.back() += str.substr(start, i - 1);
             break;
+            // skip end quote
           }
           else if (e == backslash)
           {
@@ -249,13 +273,13 @@ public:
           }
           else if (escaped)
           {
-            // args.back() += backslash + e;
+            args.back() += e;
             escaped = false;
           }
-          // else
-          // {
-          //   args.back() += e;
-          // }
+          else
+          {
+            args.back() += e;
+          }
         }
       }
     }
@@ -453,7 +477,7 @@ public:
   };
 
 private:
-  int argc_;
+  int argc_ {0};
   std::vector<std::string> argv_;
   std::string name_;
   std::string version_;
@@ -461,7 +485,7 @@ private:
   std::string description_;
   std::string modes_;
   std::string options_;
-  int options_indent_;
+  int options_indent_ {0};
   std::vector<info_pair> info_;
   std::string author_;
   std::map<std::string, Option> data_;
