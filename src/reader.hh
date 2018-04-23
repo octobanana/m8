@@ -25,7 +25,7 @@ public:
 private:
   bool readline_ {true};
 
-  std::string history_ {".m8/history.m8"};
+  std::string history_ {"~/.m8-history"};
   std::string prompt_;
   std::vector<std::string> examples {"floor", "find", "read", "round", "print!"};
 

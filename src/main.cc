@@ -1,5 +1,6 @@
 #include "m8.hh"
-#include "macros.hh"
+#include "m8_macros.hh"
+#include "user_macros.hh"
 
 #include "parg.hh"
 using Parg = OB::Parg;
@@ -14,7 +15,11 @@ int start_m8(Parg& pg);
 
 int program_options(Parg& pg)
 {
-  pg.name("m8").version("0.5.1 (10.04.2018)");
+  std::string const v_major {"0"};
+  std::string const v_minor {"5"};
+  std::string const v_patch {"2"};
+  std::string const v_date {"21.04.2018"};
+  pg.name("m8").version(v_major + "." + v_minor + "." + v_patch + " (" + v_date + ")");
 
   pg.description("a meta programming tool");
   pg.usage("[flags] [options] [--] [arguments]");
@@ -105,7 +110,10 @@ int start_m8(Parg& pg)
     M8 m8;
 
     // add internal macros
-    Macros::macros(m8);
+    Macros::m8_macros(m8);
+
+    // add user macros
+    Macros::user_macros(m8);
 
     // list out all macros if --list option given
     if (pg.get<bool>("list"))
@@ -120,7 +128,6 @@ int start_m8(Parg& pg)
       std::cout << m8.macro_info(pg.get("info"));
       return 0;
     }
-
 
     // set debug option
     m8.set_debug(pg.get<bool>("debug"));

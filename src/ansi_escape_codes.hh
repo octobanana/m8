@@ -85,20 +85,10 @@ namespace ANSI_Escape_Codes
   std::string cursor_set(size_t x, size_t y);
 
   template<class T>
-  std::string wrap(T const val, std::string col)
+  std::string wrap(T const val, std::string const col)
   {
-    std::string x {std::to_string(val)};
-    if (x.size() != 6) return {};
-    std::string h1 {x.substr(0, 2)};
-    std::string h2 {x.substr(2, 2)};
-    std::string h3 {x.substr(4, 2)};
-    std::stringstream ss; ss
-    << esc << "38;2;"
-    << htoi(h1) << ";"
-    << htoi(h2) << ";"
-    << htoi(h3) << "m"
-    << val
-    << reset;
+    std::stringstream ss;
+    ss << col << val << reset;
     return ss.str();
   }
 

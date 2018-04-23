@@ -34,7 +34,8 @@ set (SOURCES
   src/writer.cc
   src/lexer.cc
   src/parser.cc
-  src/macros.cc
+  src/m8_macros.cc
+  src/user_macros.cc
   src/sys_command.cc
   src/http.cc
   src/crypto.cc

@@ -5,8 +5,8 @@
 using Tmacro = OB::Tmacro;
 using Ast = OB::Ast;
 
-#include "cache.hh"
-using Cache = OB::Cache;
+// #include "cache.hh"
+// using Cache = OB::Cache;
 
 #include <string>
 #include <sstream>
@@ -30,12 +30,11 @@ public:
   {
     std::string& str;
     Args const& args;
-    Cache& cache;
     size_t indent {0};
+    // Cache& cache;
   }; // struct Ctx
 
   using macro_fn = std::function<int(Ctx& ctx)>;
-  // using macro_fn = std::function<int(std::string&, Args const&)>;
 
   // set external macro
   void set_macro(std::string const& name, std::string const& info,
@@ -105,6 +104,7 @@ private:
     std::string url;
     macro_fn func;
   }; // struct Macro
+  // TODO change to std::vector<Macro>
   std::map<std::string, Macro> macros;
 
   // abstract syntax tree

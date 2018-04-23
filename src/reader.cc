@@ -20,16 +20,26 @@ Reader::Reader()
 {
   if (readline_)
   {
+    auto const fn_file = [](std::string file) {
+      auto const tilde = file.find_first_of("~");
+      if (tilde != std::string::npos)
+      {
+        file.replace(tilde, 1, std::getenv("HOME"));
+      }
+      return file;
+    };
+
+    history_ = fn_file(history_);
     linenoise::LoadHistory(history_.c_str());
     // linenoise::SetMultiLine(true);
     linenoise::SetHistoryMaxLen(10);
     linenoise::SetCompletionCallback([](const char* editBuffer, std::vector<std::string>& completions) {
-      if (editBuffer[0] == 'a')
-      {
-        completions.push_back("all");
-        completions.push_back("alli");
-        completions.push_back("alligator");
-      }
+      // if (editBuffer[0] == 'a')
+      // {
+      //   completions.push_back("all");
+      //   completions.push_back("alli");
+      //   completions.push_back("alligator");
+      // }
     });
   }
 }

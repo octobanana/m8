@@ -14,15 +14,16 @@ namespace OB
 Writer::Writer(std::string file_name):
   file_name_ {file_name}
 {
+  fs::create_directories(".m8/swp");
 }
 
 Writer::~Writer()
 {
+  fs::remove_all(".m8");
 }
 
 void Writer::open()
 {
-  fs::create_directory("./.m8/swp/");
   fs::path fp {file_name_};
   fs::path p {"./.m8/swp/" + std::string(fp.filename()) + file_ext_};
   file_.open(p);
