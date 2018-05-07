@@ -47,6 +47,10 @@ void Writer::close()
   fs::path fp {file_name_};
   fs::path p1 {"./.m8/swp/" + std::string(fp.filename()) + file_ext_};
   fs::path p2 {file_name_};
+  if (! p2.parent_path().empty())
+  {
+    fs::create_directories(p2.parent_path());
+  }
   fs::rename(p1, p2);
 }
 

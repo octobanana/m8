@@ -4,7 +4,7 @@
 #include <sstream>
 #include <iostream>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <regex>
 
 #define var auto
@@ -49,10 +49,10 @@ fn escape(std::string str)
 -> std::string
 {
   var pos = size_t(0);
-  for (;; ++pos)
+  for (;; pos += 2)
   {
     pos = str.find_first_of("\n\t\r\a\b\f\v\\\"\'\?", pos);
-    if (pos == std::string::npos) break;
+    if (pos == std::string::npos || pos + 1 == std::string::npos) break;
     if (str.at(pos) == '\n')
     {
       str.replace(pos, 1, "\\\n");
@@ -221,7 +221,7 @@ fn delimit_first(std::string const& str, std::string const& delim)
   return vtok;
 }
 
-fn format(std::string str, std::map<std::string, std::string> args)
+fn format(std::string str, std::unordered_map<std::string, std::string> args)
 -> std::string
 {
   if (args.empty())
@@ -232,7 +232,7 @@ fn format(std::string str, std::map<std::string, std::string> args)
   var res = str;
   var pos = size_t(0);
   var match = std::smatch();
-  let rx = std::regex("\\{(\\w+)(?:(:[^\\r]*?)?)\\}");
+  let rx = std::regex("\\{([^\\:]+?)(?:(:[^\\r]*?)?)\\}");
 
   while (std::regex_search(res, match, rx))
   {
@@ -255,7 +255,7 @@ fn format(std::string str, std::map<std::string, std::string> args)
   return str;
 }
 
-fn xformat(std::string str, std::map<std::string, std::string> args)
+fn xformat(std::string str, std::unordered_map<std::string, std::string> args)
 -> std::string
 {
   if (args.empty())
@@ -275,6 +275,10 @@ fn xformat(std::string str, std::map<std::string, std::string> args)
     var first = std::string(match[1]);
     var second = std::string(match[2]);
     pos += std::string(match.prefix()).size();
+
+    // std::cerr << "m: " << m << "\n";
+    // std::cerr << "first: " << first << "\n";
+    // std::cerr << "second: " << second << "\n";
 
     if (second.size() > 0)
     {
@@ -297,7 +301,22 @@ fn xformat(std::string str, std::map<std::string, std::string> args)
     else
     {
       std::smatch match_complex;
-      std::regex rx {"^:([*]{1})(.+)([a-z0-9]{1}):([^\\r]+):" + first + "$"};
+
+      std::stringstream first_esc;
+      for (auto const& e : first)
+      {
+        if (std::isalnum(e))
+        {
+          first_esc << e;
+        }
+        else
+        {
+          first_esc << "\\" << e;
+        }
+      }
+      // {0:*;\n;i:${BUILD_DIR}/[i]\n:0}
+      std::regex rx {"^:([*]{1});([^;]+?);([a-z0-9]{1}):([^:]+?):" + first_esc.str() + "$"};
+
       if (std::regex_match(second, match_complex, rx))
       {
         std::string type {match_complex[1]};
@@ -305,9 +324,24 @@ fn xformat(std::string str, std::map<std::string, std::string> args)
         std::string index_char {match_complex[3]};
         std::string rstr {match_complex[4]};
 
-        auto vec = String::delimit(args[first], delim);
-        std::stringstream ss;
+        rstr = String::unescape(rstr);
+        delim = String::unescape(delim);
 
+        // std::cerr << "match: " << match_complex[0] << "\n";
+        // std::cerr << "type: " << type << "\n";
+        // std::cerr << "delim: " << delim << "\n";
+        // std::cerr << "index_char: " << index_char << "\n";
+        // std::cerr << "rstr: " << rstr << "\n";
+
+        auto vec = String::delimit(args[first], delim);
+        for (size_t i = 0; i < vec.size(); ++i)
+        {
+          if (vec.at(i).empty())
+          {
+            vec.erase(vec.begin() + i);
+          }
+        }
+        std::stringstream ss;
         for (auto const& e : vec)
         {
           ss << String::replace_all(rstr, "[" + index_char + "]", e);
@@ -326,7 +360,78 @@ fn xformat(std::string str, std::map<std::string, std::string> args)
     }
   }
 
+  str = String::replace_all(str, "\n\n", "\n");
   return str;
+}
+
+fn correct(std::string const& str, std::vector<std::string> const& lst)
+-> std::vector<std::string>
+{
+  std::vector<std::string> matches;
+
+  let len = (str.size() / 1.2);
+  std::stringstream estr;
+  for (let& e : str)
+  {
+    if (std::isalnum(e))
+    {
+      estr << e;
+    }
+    else
+    {
+      estr << "\\" << e;
+    }
+  }
+  std::string rx {"^.*[" + estr.str() + "]{" + std::to_string(len) + "}.*$"};
+
+  for (let& e : lst)
+  {
+    std::smatch m;
+    if (std::regex_match(e, m, std::regex(rx, std::regex::icase)))
+    {
+      matches.emplace_back(m[0]);
+    }
+  }
+
+  std::sort(matches.begin(), matches.end(),
+  [](std::string const& lhs, std::string const& rhs) {
+    return lhs.size() < rhs.size();
+  });
+
+  if (matches.size() > 8)
+  {
+    matches.erase(matches.begin() + 8, matches.end());
+  }
+
+  return matches;
+}
+
+fn starts_with(std::string const& str, std::string const& val)
+-> bool
+{
+  if (str.empty() || str.size() < val.size())
+  {
+    return false;
+  }
+  if (str.compare(0, val.size(), str) == 0)
+  {
+    return true;
+  }
+  return false;
+}
+
+fn ends_with(std::string const& str, std::string const& val)
+-> bool
+{
+  if (str.empty() || str.size() < val.size())
+  {
+    return false;
+  }
+  if (str.compare(str.size() - val.size(), val.size(), str) == 0)
+  {
+    return true;
+  }
+  return false;
 }
 
 } // namespace String

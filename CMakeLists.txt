@@ -54,11 +54,11 @@ add_executable (
 
 target_link_libraries (
   ${TARGET}
-  curl
   pthread
-  crypto
   stdc++fs
-  boost_serialization
+  crypto
+  curl
+  # boost_serialization
 )
 
 install (TARGETS ${TARGET} DESTINATION "/usr/local/bin")

@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
 
 #define var auto
 #define let auto const
@@ -42,11 +42,20 @@ fn delimit(std::string const& str, std::string const& delim)
 fn delimit_first(std::string const& str, std::string const& delim)
 -> std::vector<std::string>;
 
-fn format(std::string str, std::map<std::string, std::string> args)
+fn format(std::string str, std::unordered_map<std::string, std::string> args)
 -> std::string;
 
-fn xformat(std::string str, std::map<std::string, std::string> args)
+fn xformat(std::string str, std::unordered_map<std::string, std::string> args)
 -> std::string;
+
+fn correct(std::string const& str, std::vector<std::string> const& lst)
+-> std::vector<std::string>;
+
+fn starts_with(std::string const& str, std::string const& val)
+-> bool;
+
+fn ends_with(std::string const& str, std::string const& val)
+-> bool;
 
 } // namespace String
 

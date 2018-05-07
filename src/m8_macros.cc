@@ -31,6 +31,7 @@ using Json = nlohmann::json;
 #include <thread>
 #include <chrono>
 #include <map>
+#include <unordered_map>
 #include <vector>
 #include <regex>
 #include <functional>
@@ -42,6 +43,7 @@ using Json = nlohmann::json;
 #include <unistd.h>
 #include <cmath>
 #include <utility>
+#include <random>
 
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
@@ -52,10 +54,11 @@ namespace Macros
 #define var auto
 #define let auto const
 #define fn auto
+#define lm auto const
 
 // variables
 
-var db = std::map<std::string, std::string>();
+var db = std::unordered_map<std::string, std::string>();
 std::string m8_delim_start;
 std::string m8_delim_end;
 
@@ -146,15 +149,20 @@ auto const fn_sh = [](auto& ctx) {
 
 auto const fn_file = [](auto& ctx) {
   var file_path = ctx.args.at(1);
-  auto const tilde = file_path.find_first_of("~");
-  if (tilde != std::string::npos)
+  if (file_path.empty())
   {
-    file_path.replace(tilde, 1, std::getenv("HOME"));
+    ctx.err_msg = "file name is empty";
+    return -1;
+  }
+  if (file_path.front() == '~')
+  {
+    file_path.replace(0, 1, std::getenv("HOME"));
   }
 
   std::ifstream file {file_path};
   if (! file.is_open())
   {
+    ctx.err_msg = "could not open file";
     return -1;
   }
 
@@ -189,9 +197,16 @@ auto const fn_headerpp = [](auto& ctx) {
     str_upper += std::toupper(e);
   }
 
+  auto tnano = std::chrono::system_clock::now().time_since_epoch();
+  long int uuid = std::chrono::duration_cast<std::chrono::nanoseconds>(tnano).count();
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::string sid {Crypto::sha256(std::to_string(uuid) + std::to_string(gen()))};
+  sid = sid.substr(0, 8);
+
   std::stringstream ss; ss
-  << "#ifndef OB_" << str_upper << "_HH\n"
-  << "#define OB_" << str_upper << "_HH\n"
+  << "#ifndef OB_" << str_upper << "_HH_" << sid << "\n"
+  << "#define OB_" << str_upper << "_HH_" << sid << "\n"
   << "\n"
   << "#include <string>\n"
   << "#include <sstream>\n"
@@ -655,11 +670,20 @@ auto const fn_def = [&](auto& ctx) {
   var delim_start = m8_delim_start;
   var delim_end = m8_delim_end;
 
-  m8.set_macro(name, "", "", "", [&, name, delim_start, delim_end](auto& ctx) {
+  auto str = std::string();
+  auto ss = std::stringstream();
+  for (size_t i = 2; i < ctx.args.size(); ++i)
+  {
+    ss << ctx.args.at(i);
+  }
+  str = ss.str();
+  db[name] = str;
+
+  m8.set_macro(name, "def-macro", str, "", [&, name, delim_start, delim_end](auto& ctx) {
     if (db.find(name) == db.end()) return -1;
     auto tmp = db[name];
 
-    auto arg_map = std::map<std::string, std::string>();
+    auto arg_map = std::unordered_map<std::string, std::string>();
     for (size_t i = 1; i < ctx.args.size(); ++i)
     {
       auto pos = ctx.args.at(i).find(":");
@@ -673,19 +697,11 @@ auto const fn_def = [&](auto& ctx) {
     // tmp = String::unescape(tmp);
     tmp = String::replace_first(tmp, "`" + delim_start, delim_start);
     tmp = String::replace_last(tmp, delim_end + "`", delim_end);
-    tmp = String::replace_all(tmp, "\n", std::string(ctx.indent, ' ') + "\n");
+    // tmp = String::replace_all(tmp, "\n", std::string(ctx.indent, ' ') + "\n");
     ctx.str = tmp;
     return 0;
   });
 
-  auto str = std::string();
-  auto ss = std::stringstream();
-  for (size_t i = 2; i < ctx.args.size(); ++i)
-  {
-    ss << ctx.args.at(i);
-  }
-  str = ss.str();
-  db[name] = str;
   return 0;
 };
 
@@ -831,8 +847,26 @@ auto const fn_cmp = [&](auto& ctx) {
   return 0;
 };
 
+auto const fn_test_regex = [&](auto& ctx) {
+  auto str = ctx.args.at(1);
+  ctx.str = str;
+  return 0;
+};
+
+lm fn_file_write = [&](var& ctx) {
+  let file = ctx.args.at(1);
+  let str = ctx.args.at(2);
+  std::ofstream ofile {file, std::ios::app};
+  if (! ofile.is_open()) return -1;
+  ofile << str << "\n";
+  return 0;
+};
+
 // define macros
+// single regex and func
 // M8::set_macro(name, info, usage, regex, func)
+// overloaded regex and func
+// M8::set_macro(name, info, usage, {{regex, func}, {regex, func}})
 
 // m8.set_macro("",
 //   "",
@@ -844,17 +878,229 @@ auto const fn_cmp = [&](auto& ctx) {
 //   return 0;
 //   });
 
-m8.set_macro("info",
+m8.set_macro("m8:file",
+  "current file name",
   "",
   "",
-  "^(.*)$",
-  fn_info);
+  [&](auto& ctx) {
+  ctx.str = ctx.file;
+  return 0;
+  });
+
+m8.set_macro("m8:line",
+  "current line number",
+  "",
+  "",
+  [&](auto& ctx) {
+  ctx.str = std::to_string(ctx.line);
+  return 0;
+  });
+
+m8.set_macro("rand",
+  "generate random number",
+  "",
+  "",
+  [&](auto& ctx) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  ctx.str = std::to_string(gen());
+  return 0;
+  });
+
+m8.set_macro("nano",
+  "epoch time in nanoseconds",
+  "",
+  "",
+  [&](auto& ctx) {
+  auto tnano = std::chrono::system_clock::now().time_since_epoch();
+  long int uuid = std::chrono::duration_cast<std::chrono::nanoseconds>(tnano).count();
+  ctx.str = std::to_string(uuid);
+  return 0;
+  });
+
+m8.set_macro("substr",
+  "get substring of a string",
+  "(\\d+){ws}(\\d+){ws}{!all}",
+  "{b}(\\d+){ws}(\\d+){ws}{!all}{e}",
+  [&](auto& ctx) {
+  var start = std::stoi(ctx.args.at(1));
+  var end = std::stoi(ctx.args.at(2));
+  var str = ctx.args.at(3);
+  if (start > str.size())
+  {
+    return -1;
+  }
+  if (end > str.size())
+  {
+    ctx.str = str.substr(start);
+    return 0;
+  }
+  ctx.str = str.substr(start, end);
+  return 0;
+  });
+
+lm fn_test_hook_info = [&](auto& ctx) {
+  std::stringstream st;
+  st << ctx.args.at(1);
+  char t;
+  st >> t;
+
+  std::stringstream ss;
+
+  lm stringify_hooks = [&](auto t) {
+    if (auto h = m8.get_hooks(t))
+    {
+      for (auto const& e : *h)
+      {
+        ss << "k: " << e.key << "\nv: " << e.val << "\n";
+      }
+    }
+  };
+
+  if (t == 'b')
+  {
+    stringify_hooks(M8::Htype::begin);
+  }
+  else if (t == 'm')
+  {
+    stringify_hooks(M8::Htype::macro);
+  }
+  else if (t == 'r')
+  {
+    stringify_hooks(M8::Htype::res);
+  }
+  else if (t == 'e')
+  {
+    stringify_hooks(M8::Htype::end);
+  }
+  else
+  {
+    return -1;
+  }
+
+  ctx.str = ss.str();
+  return 0;
+};
+lm fn_test_hook_rm = [&](auto& ctx) {
+  std::stringstream ss;
+  ss << ctx.args.at(1);
+  char t;
+  ss >> t;
+  var s1 = ctx.args.at(2);
+
+  if (t == 'b')
+  {
+    m8.rm_hook(M8::Htype::begin, s1);
+  }
+  else if (t == 'm')
+  {
+    m8.rm_hook(M8::Htype::macro, s1);
+  }
+  else if (t == 'r')
+  {
+    m8.rm_hook(M8::Htype::res, s1);
+  }
+  else if (t == 'e')
+  {
+    m8.rm_hook(M8::Htype::end, s1);
+  }
+  else
+  {
+    return -1;
+  }
+  return 0;
+};
+lm fn_test_hook_add = [&](auto& ctx) {
+  std::stringstream ss;
+  ss << ctx.args.at(1);
+  char t;
+  ss >> t;
+  var s1 = ctx.args.at(2);
+  var s2 = ctx.args.at(3);
+
+  for (size_t i = 0; i < ctx.args.size(); ++i)
+  {
+    debugf(ctx.args.at(i))
+  }
+
+  if (t == 'b')
+  {
+    m8.set_hook(M8::Htype::begin, {s1, s2});
+  }
+  else if (t == 'm')
+  {
+    m8.set_hook(M8::Htype::macro, {s1, s2});
+  }
+  else if (t == 'r')
+  {
+    m8.set_hook(M8::Htype::res, {s1, s2});
+  }
+  else if (t == 'e')
+  {
+    m8.set_hook(M8::Htype::end, {s1, s2});
+  }
+  else
+  {
+    return -1;
+  }
+  return 0;
+};
+m8.set_macro("test:hook:add",
+  "test add hook macro",
+  "1[bre] str str",
+  {
+    {"{b}([bmre]{1}){ws}{!str_s}{ws}{!str_s}{e}", fn_test_hook_add},
+  });
+m8.set_macro("test:hook:rm",
+  "test remove hook macro",
+  "1[bre] str",
+  {
+    {"{b}([bmre]{1}){ws}{!str_s}{e}", fn_test_hook_rm},
+  });
+m8.set_macro("test:hook:info",
+  "test info hook macro",
+  "1[bre]",
+  {
+    {"{b}([bmre]{1}){e}", fn_test_hook_info},
+  });
+
+std::string const str_s {"'([^'\\\\]*(?:\\\\.[^'\\\\]*)*)'"};
+std::string const str_d {"\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\""};
+std::string const ws {"\\s+"};
+lm rg = [&](std::string str) {
+  std::stringstream ss; ss
+  << "^"
+  << str
+  << "$";
+  return ss.str();
+};
+m8.set_macro("test:regex",
+  "test overloading regexes",
+  "num",
+  {
+    {"^([0-9]{1})$", fn_test_regex},
+    {"^([0-9]{2})$", fn_test_regex},
+    {rg(str_s), fn_test_regex},
+    {rg(str_d), fn_test_regex},
+  });
 
 m8.set_macro("test:parg",
   "",
   "",
   "^([^\\r]*)$",
   fn_test_parg);
+
+m8.set_macro("_def",
+  "",
+  "str str",
+  "^(.+)$",
+  fn_info);
+
+m8.set_macro("info",
+  "",
+  "",
+  "^(.+)$",
+  fn_info);
 
 m8.set_macro("cpp:enum",
   "",
@@ -870,8 +1116,8 @@ m8.set_macro("version",
 
 m8.set_macro("eq",
   "",
-  "",
-  "",
+  "num num",
+  "^([\\d]{1})\\s([\\d]{1})$",
   fn_eq);
 
 m8.set_macro("M8::IF",
@@ -881,9 +1127,9 @@ m8.set_macro("M8::IF",
   fn_if_else);
 
 m8.set_macro("nop",
-  "",
-  "",
-  "",
+  "returns input untouched",
+  "{!all}",
+  "{b}{!all}{e}",
   fn_nop);
 
 m8.set_macro("if",
@@ -948,8 +1194,8 @@ m8.set_macro("count",
 
  m8.set_macro("sha256",
    "returns an sha256 hash of input string",
-   "sha256 \"str\"",
-   "^\"([^\\r]+?)\"$",
+   "{!all}",
+   "{b}{!all}{e}",
    fn_sha256);
 
 m8.set_macro("get",
@@ -981,6 +1227,14 @@ m8.set_macro("floor",
   "floor n",
   "",
   fn_math_floor);
+
+m8.set_macro("out",
+  "send output to file",
+  "{b}{!str}{ws}{!all}{e}",
+  {
+    {"{b}{!str_s}{ws}{!all}{e}", fn_file_write},
+    {"{b}{!str_d}{ws}{!all}{e}", fn_file_write},
+  });
 
 m8.set_macro("in",
   "get input from stdin",
@@ -1110,8 +1364,8 @@ m8.set_macro("sh",
 
 m8.set_macro("file",
   "read in a file",
-  "file file_path",
-  "",
+  "{b}{!str_s}{e}",
+  "{b}{!str_s}{e}",
   fn_file);
 
 m8.set_macro("license",
@@ -1137,5 +1391,6 @@ m8.set_macro("comment_header",
 #undef var
 #undef let
 #undef fn
+#undef lm
 
 } // namespace Macros

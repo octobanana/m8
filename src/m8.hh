@@ -13,10 +13,19 @@ using Ast = OB::Ast;
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <unordered_map>
 #include <vector>
 #include <regex>
 #include <functional>
 #include <utility>
+#include <deque>
+#include <optional>
+
+int const DEBUG {0};
+#define debug(x) if (DEBUG) std::cerr << AEC::wrap(x, AEC::fg_true("f50")) << " ";
+#define debug_nl if (DEBUG) std::cerr << "\n";
+#define debugf(x) debug_format(#x, x)
+#define debug_format(x, y) if (DEBUG) std::cerr << AEC::wrap(x, AEC::fg_true("f50")) << ": " << AEC::wrap(y, AEC::fg_green) << "\n";
 
 class M8
 {
@@ -30,7 +39,9 @@ public:
   {
     std::string& str;
     Args const& args;
-    size_t indent {0};
+    std::string file;
+    uint32_t line {0};
+    std::string err_msg;
     // Cache& cache;
   }; // struct Ctx
 
@@ -38,15 +49,38 @@ public:
 
   // set external macro
   void set_macro(std::string const& name, std::string const& info,
-    std::string const& usage, std::string const& regex);
+    std::string const& usage, std::string regex);
 
   // set remote macro
   void set_macro(std::string const& name, std::string const& info,
-    std::string const& usage, std::string const& regex, std::string const& url);
+    std::string const& usage, std::string regex, std::string const& url);
 
   // set internal macro
   void set_macro(std::string const& name, std::string const& info,
-    std::string const& usage, std::string const& regex, macro_fn fn);
+    std::string const& usage, std::string regex, macro_fn func);
+
+  // set internal macro
+  void set_macro(std::string const& name, std::string const& info,
+    std::string const& usage, std::vector<std::pair<std::string, macro_fn>> rx_fn);
+
+  // plain macro hooks
+  enum class Htype
+  {
+    begin,
+    macro,
+    res,
+    end
+  };
+  struct Hook
+  {
+    std::string key;
+    std::string val;
+  };
+  using Hooks = std::deque<Hook>;
+  void set_hook(Htype t, Hook h);
+  std::optional<Hooks> get_hooks(Htype t) const;
+  void rm_hook(Htype t, std::string key);
+  void run_hooks(Hooks const& h, std::string& s);
 
   void set_debug(bool val);
   void set_copy(bool val);
@@ -72,6 +106,7 @@ private:
     int internal {0};
     int external {0};
     int remote {0};
+    std::map<std::string, uint32_t> count;
   }; // struct Stats
   Stats stats;
 
@@ -87,6 +122,17 @@ private:
   size_t len_end {delim_end_.length()};
   size_t len_total {len_start + len_end};
 
+  std::unordered_map<std::string, std::string> rx_grammar {
+    {"b", "^"},
+    {"e", "$"},
+    {"ws", "\\s+"},
+    {"!all", "([^\\r]+?)"},
+    {"!int", "([0-9]+)"},
+    {"!dec", "([0-9]+\.[0-9]+)"},
+    {"!str_s", "'([^'\\\\]*(?:\\\\.[^'\\\\]*)*)'"},
+    {"!str_d", "\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\""},
+  };
+
   enum class Mtype
   {
     internal,
@@ -100,17 +146,21 @@ private:
     std::string name;
     std::string info;
     std::string usage;
-    std::string regex;
+    std::vector<std::pair<std::string, macro_fn>> rx_fn;
     std::string url;
-    macro_fn func;
   }; // struct Macro
-  // TODO change to std::vector<Macro>
   std::map<std::string, Macro> macros;
 
   // abstract syntax tree
   Ast ast_;
 
-  int run_internal(Macro const& macro, Ctx& ctx);
+  // hooks
+  Hooks h_begin;
+  Hooks h_macro;
+  Hooks h_res;
+  Hooks h_end;
+
+  int run_internal(macro_fn const& func, Ctx& ctx);
   int run_external(Macro const& macro, Ctx& ctx);
   int run_remote(Macro const& macro, Ctx& ctx);
 

@@ -1,11 +1,19 @@
 #include "m8.hh"
 #include "m8_macros.hh"
 #include "user_macros.hh"
+#include "timer.hh"
+
+#include "term.hh"
+using Term = OB::Term;
 
 #include "parg.hh"
 using Parg = OB::Parg;
 
+#include "ansi_escape_codes.hh"
+namespace AEC = OB::ANSI_Escape_Codes;
+
 #include <string>
+#include <iomanip>
 #include <iostream>
 #include <algorithm>
 
@@ -17,13 +25,15 @@ int program_options(Parg& pg)
 {
   std::string const v_major {"0"};
   std::string const v_minor {"5"};
-  std::string const v_patch {"2"};
-  std::string const v_date {"21.04.2018"};
-  pg.name("m8").version(v_major + "." + v_minor + "." + v_patch + " (" + v_date + ")");
+  std::string const v_patch {"6"};
+  std::string const date {"04.05.2018"};
+  std::string const author {"Brett Robinson (octobanana) <octobanana.dev@gmail.com>"};
+
+  pg.name("m8").version(v_major + "." + v_minor + "." + v_patch + " (" + date + ")");
 
   pg.description("a meta programming tool");
   pg.usage("[flags] [options] [--] [arguments]");
-  pg.usage("[-f 'input_file'] [-o 'output_file'] [-c 'config file'] [-s 'start_delim'] [-e 'end_delim'] [d]");
+  pg.usage("[-f 'input_file'] [-o 'output_file'] [-c 'config file'] [-s 'start_delim' -e 'end_delim' | -m 'mirror_delim'] [d]");
   pg.usage("[-v|--version]");
   pg.usage("[-h|--help]");
   pg.info("Exit Codes", {"0 -> normal", "1 -> error"});
@@ -35,7 +45,7 @@ int program_options(Parg& pg)
     pg.name() + "--help",
     pg.name() + "--version",
   });
-  pg.author("Brett Robinson (octobanana) <octobanana.dev@gmail.com>");
+  pg.author(author);
 
   // singular flags
   pg.set("help,h", "print the help output");
@@ -47,6 +57,8 @@ int program_options(Parg& pg)
   pg.set("interpreter,i", "start the interpreter in readline mode");
   pg.set("no-copy", "do not copy outside text");
   pg.set("summary", "print out summary at end");
+  pg.set("timer,t", "print out execution time in milliseconds");
+  pg.set("color", "print output in color");
 
   // singular options
   pg.set("info", "", "str", "view informatin on specific macro");
@@ -86,6 +98,13 @@ int program_options(Parg& pg)
     std::cout << pg.name() << " v" << pg.version() << "\n";
     return 1;
   }
+
+  if (pg.get<bool>("color") && (! Term::is_term(STDOUT_FILENO) || ! Term::is_term(STDERR_FILENO)))
+  {
+    std::cout << "Error: flag 'color' can not be used on a non-interactive terminal\n";
+    return -1;
+  }
+
   return 0;
 }
 
@@ -175,7 +194,7 @@ int start_m8(Parg& pg)
   }
   catch (std::exception const& e)
   {
-    std::cerr << "Error: " << e.what() << "\n";
+    std::cerr << AEC::wrap("Error: ", AEC::fg_red) << e.what() << "\n";
     return 1;
   }
 }
@@ -187,5 +206,24 @@ int main(int argc, char *argv[])
   if (pstatus > 0) return 0;
   if (pstatus < 0) return 1;
 
-  return start_m8(pg);
+  auto show_time = pg.get<bool>("timer");
+  OB::Timer t;
+  if (show_time)
+  {
+    t.start();
+  }
+
+  auto status = start_m8(pg);
+
+  if (show_time)
+  {
+    t.stop();
+    long double time {static_cast<long double>(t.time<std::chrono::nanoseconds>())};
+    time /= 1000000000;
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(4) << time;
+    std::cout << AEC::wrap("time: ", AEC::fg_magenta) << AEC::wrap(ss.str(), AEC::fg_green) << "\n";
+  }
+
+  return status;
 }

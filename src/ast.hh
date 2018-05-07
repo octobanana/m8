@@ -20,6 +20,7 @@ struct Tmacro
   std::string args;
   std::vector<Tmacro> children;
   std::vector<std::string> match;
+  size_t fn_index {0};
   std::string res;
 }; // struct Tmacro
 

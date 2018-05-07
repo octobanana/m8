@@ -24,12 +24,12 @@ if [[ ${BUILD_TYPE} == "Debug" ]]; then
   mkdir -p build/debug
   cd build/debug
   cmake ../../ -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
-  time make
+  time make -j $((2 * $(nproc --all)))
 
 elif [[ ${BUILD_TYPE} == "Release" ]]; then
   printf "\nCompiling ${APP}\n"
   mkdir -p build/release
   cd build/release
   cmake ../../ -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
-  time make
+  time make -j $((2 * $(nproc --all)))
 fi

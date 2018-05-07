@@ -13,6 +13,9 @@ namespace AEC = OB::ANSI_Escape_Codes;
 #include <map>
 #include <cctype>
 
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+
 namespace OB
 {
 
@@ -24,15 +27,20 @@ Reader::Reader()
       auto const tilde = file.find_first_of("~");
       if (tilde != std::string::npos)
       {
-        file.replace(tilde, 1, std::getenv("HOME"));
+        std::string home {std::getenv("HOME")};
+        if (home.empty())
+        {
+          throw std::runtime_error("could not open the input file");
+        }
+        file.replace(tilde, 1, home);
       }
       return file;
     };
 
     history_ = fn_file(history_);
     linenoise::LoadHistory(history_.c_str());
-    // linenoise::SetMultiLine(true);
-    linenoise::SetHistoryMaxLen(10);
+    linenoise::SetMultiLine(true);
+    linenoise::SetHistoryMaxLen(1000);
     linenoise::SetCompletionCallback([](const char* editBuffer, std::vector<std::string>& completions) {
       // if (editBuffer[0] == 'a')
       // {
@@ -71,7 +79,7 @@ bool Reader::next(std::string& str)
   if (readline_)
   {
     bool quit {false};
-    prompt_ = AEC::fg_magenta + "M8>" + AEC::reset + " ";
+    prompt_ = AEC::wrap("M8[", AEC::fg_magenta) + AEC::wrap(std::to_string(row_), AEC::fg_green) + AEC::wrap("]>", AEC::fg_magenta) + " ";
     std::string input = linenoise::Readline(prompt_.c_str(), quit);
     if (input == ".quit" || input == ".quit" || quit)
     {

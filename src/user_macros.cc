@@ -14,14 +14,17 @@ namespace Macros
 void user_macros(M8& m8)
 {
   // define macros
+  // single regex and func
   // M8::set_macro(name, info, usage, regex, func)
+  // overloaded regex and func
+  // M8::set_macro(name, info, usage, {{regex, func}, {regex, func}})
 
   // m8.set_macro("",
   //   "",
   //   "",
   //   "^(.*)$",
   //   [&](auto& ctx) {
-  //   var str = ctx.args.at(1);
+  //   auto str = ctx.args.at(1);
   //   ctx.str = str;
   //   return 0;
   //   });
