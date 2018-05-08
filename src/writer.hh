@@ -22,6 +22,7 @@ public:
 private:
   std::string file_ext_ {".swp.m8"};
   std::string file_name_;
+  std::string file_tmp_;
   std::ofstream file_;
 
 }; // class Writer

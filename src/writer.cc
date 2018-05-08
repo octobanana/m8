@@ -1,4 +1,5 @@
 #include "writer.hh"
+#include "crypto.hh"
 
 #include <string>
 #include <sstream>
@@ -19,13 +20,22 @@ Writer::Writer(std::string file_name):
 
 Writer::~Writer()
 {
-  fs::remove_all(".m8");
+  // if (fs::path(".m8/swp").empty())
+  // {
+  //   fs::remove_all(".m8/swp");
+  // }
+
+  // if (fs::path(".m8").empty())
+  // {
+  //   fs::remove_all(".m8");
+  // }
 }
 
 void Writer::open()
 {
   fs::path fp {file_name_};
-  fs::path p {"./.m8/swp/" + std::string(fp.filename()) + file_ext_};
+  file_tmp_ = ".m8/swp/" + Crypto::sha256(fp) + file_ext_;
+  fs::path p {file_tmp_};
   file_.open(p);
   if (! file_.is_open())
   {
@@ -45,7 +55,7 @@ void Writer::close()
     file_.close();
   }
   fs::path fp {file_name_};
-  fs::path p1 {"./.m8/swp/" + std::string(fp.filename()) + file_ext_};
+  fs::path p1 {file_tmp_};
   fs::path p2 {file_name_};
   if (! p2.parent_path().empty())
   {

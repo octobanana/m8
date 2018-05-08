@@ -360,7 +360,6 @@ fn xformat(std::string str, std::unordered_map<std::string, std::string> args)
     }
   }
 
-  str = String::replace_all(str, "\n\n", "\n");
   return str;
 }
 

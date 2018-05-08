@@ -694,10 +694,12 @@ auto const fn_def = [&](auto& ctx) {
     }
 
     tmp = String::xformat(tmp, arg_map);
-    // tmp = String::unescape(tmp);
+    if (String::ends_with(tmp, "\n\n"))
+    {
+      tmp = String::replace_last(tmp, "\n\n", "\n");
+    }
     tmp = String::replace_first(tmp, "`" + delim_start, delim_start);
     tmp = String::replace_last(tmp, delim_end + "`", delim_end);
-    // tmp = String::replace_all(tmp, "\n", std::string(ctx.indent, ' ') + "\n");
     ctx.str = tmp;
     return 0;
   });
@@ -791,6 +793,7 @@ auto const fn_script = [&](auto& ctx) {
   // if (ctx.cache.get(ckey, ctx.str)) return 0;
 
   var str = ctx.args.at(1);
+  std::cout << str << "\n";
   let path = std::string(".m8/.m8-script.tmp.m8");
   var ofile = std::ofstream(path);
   ofile << str;
