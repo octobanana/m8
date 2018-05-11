@@ -36,7 +36,7 @@ void Writer::open()
   fs::path fp {file_name_};
   file_tmp_ = ".m8/swp/" + Crypto::sha256(fp) + file_ext_;
   fs::path p {file_tmp_};
-  file_.open(p);
+  file_.open(p, std::ios::app);
   if (! file_.is_open())
   {
     throw std::runtime_error("could not open the output file");
@@ -54,14 +54,14 @@ void Writer::close()
   {
     file_.close();
   }
-  fs::path fp {file_name_};
-  fs::path p1 {file_tmp_};
-  fs::path p2 {file_name_};
-  if (! p2.parent_path().empty())
-  {
-    fs::create_directories(p2.parent_path());
-  }
-  fs::rename(p1, p2);
+  // fs::path fp {file_name_};
+  // fs::path p1 {file_tmp_};
+  // fs::path p2 {file_name_};
+  // if (! p2.parent_path().empty())
+  // {
+  //   fs::create_directories(p2.parent_path());
+  // }
+  // fs::rename(p1, p2);
 }
 
 } // namespace OB

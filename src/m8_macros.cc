@@ -886,7 +886,7 @@ m8.set_macro("m8:file",
   "",
   "",
   [&](auto& ctx) {
-  ctx.str = ctx.file;
+  ctx.str = ctx.ifile;
   return 0;
   });
 

@@ -39,7 +39,8 @@ public:
   {
     std::string& str;
     Args const& args;
-    std::string file;
+    std::string ifile;
+    std::string ofile;
     uint32_t line {0};
     std::string err_msg;
     // Cache& cache;
@@ -159,6 +160,8 @@ private:
   Hooks h_macro;
   Hooks h_res;
   Hooks h_end;
+
+  void core_macros();
 
   int run_internal(macro_fn const& func, Ctx& ctx);
   int run_external(Macro const& macro, Ctx& ctx);

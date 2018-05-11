@@ -59,10 +59,28 @@ using Json = nlohmann::json;
 
 M8::M8()
 {
+  core_macros();
 }
 
 M8::~M8()
 {
+}
+
+void M8::core_macros()
+{
+  set_macro("m8:include",
+    "include a files contents",
+    "{str}",
+    "{b}{!str_s}{e}",
+    [&](auto& ctx) {
+    auto str = ctx.args.at(1);
+    if (str.empty())
+    {
+      return -1;
+    }
+    parse(ctx.args.at(1), ctx.ofile);
+    return 0;
+    });
 }
 
 void M8::set_debug(bool val)
@@ -207,10 +225,10 @@ void M8::set_config(std::string file_name)
 
   // read in the config file into memory
   file.seekg(0, std::ios::end);
-  size_t size (file.tellg());
+  size_t size (static_cast<size_t>(file.tellg()));
   std::string content (size, ' ');
   file.seekg(0);
-  file.read(&content[0], size);
+  file.read(&content[0], static_cast<std::streamsize>(size));
 
   // parse the contents
   Json j = Json::parse(content);
@@ -342,7 +360,7 @@ std::optional<M8::Hooks> M8::get_hooks(Htype t) const
 void M8::rm_hook(Htype t, std::string key)
 {
   auto const rm_key = [&](auto& m) {
-    size_t i {0};
+    long int i {0};
     for (auto& e : m)
     {
       if (e.key == key)
@@ -406,14 +424,6 @@ void M8::run_hooks(Hooks const& h, std::string& s)
 
 void M8::parse(std::string const& _ifile, std::string const& _ofile)
 {
-  auto& ast = ast_.ast;
-
-  // init cache
-  // Cache cache_ {_ifile};
-
-  // init the parsing stack
-  std::stack<Tmacro> stk;
-
   // init the reader
   Reader r;
   if (! readline_ || ! _ifile.empty())
@@ -427,6 +437,10 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
   {
     w.open();
   }
+
+  auto& ast = ast_.ast;
+  std::stack<Tmacro> stk;
+  // Cache cache_ {_ifile};
 
   std::string line;
   while(r.next(line))
@@ -939,21 +953,27 @@ invalid_arg:
 
               // process macro
               int ec {0};
-              Ctx ctx {t.res, t.match, _ifile, r.row()};
+              Ctx ctx {t.res, t.match, _ifile, _ofile, r.row(), ""};
               try
               {
+                // call internal
                 if (it->second.type == Mtype::internal)
                 {
                   ec = run_internal(it->second.rx_fn.at(t.fn_index).second, ctx);
                 }
+
+                // call remote
                 else if (it->second.type == Mtype::remote)
                 {
                   ec = run_remote(it->second, ctx);
                 }
-                else
+
+                // call external
+                else if (it->second.type == Mtype::external)
                 {
                   ec = run_external(it->second, ctx);
                 }
+
                 ++stats.macro;
               }
               catch (std::exception const& e)

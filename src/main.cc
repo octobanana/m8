@@ -2,6 +2,7 @@
 #include "m8_macros.hh"
 #include "user_macros.hh"
 #include "timer.hh"
+#include "crypto.hh"
 
 #include "term.hh"
 using Term = OB::Term;
@@ -11,6 +12,9 @@ using Parg = OB::Parg;
 
 #include "ansi_escape_codes.hh"
 namespace AEC = OB::ANSI_Escape_Codes;
+
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
 
 #include <string>
 #include <iomanip>
@@ -183,6 +187,20 @@ int start_m8(Parg& pg)
 
     // parse
     m8.parse(pg.get("file"), pg.get("output"));
+
+    if (! pg.get("output").empty())
+    {
+      std::string ofile {pg.get("output")};
+      fs::path fp {ofile};
+      std::string otmp {".m8/swp/" + Crypto::sha256(fp) + ".swp.m8"};
+      fs::path p1 {otmp};
+      fs::path p2 {ofile};
+      if (! p2.parent_path().empty())
+      {
+        fs::create_directories(p2.parent_path());
+      }
+      fs::rename(p1, p2);
+    }
 
     // print out summary
     if (pg.get<bool>("summary"))
