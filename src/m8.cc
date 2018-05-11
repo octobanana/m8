@@ -78,7 +78,14 @@ void M8::core_macros()
     {
       return -1;
     }
-    parse(ctx.args.at(1), ctx.ofile);
+    try
+    {
+      parse(ctx.args.at(1), ctx.ofile);
+    }
+    catch (std::exception const& e)
+    {
+      return -1;
+    }
     return 0;
     });
 }
