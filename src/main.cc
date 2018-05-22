@@ -4,6 +4,9 @@
 #include "timer.hh"
 #include "crypto.hh"
 
+#include "string.hh"
+namespace String = OB::String;
+
 #include "term.hh"
 using Term = OB::Term;
 
@@ -22,7 +25,6 @@ namespace fs = std::experimental::filesystem;
 #include <algorithm>
 
 int program_options(Parg& pg);
-void replace_all(std::string& str, std::string const& key, std::string const& val);
 int start_m8(Parg& pg);
 
 int program_options(Parg& pg)
@@ -75,7 +77,7 @@ int program_options(Parg& pg)
   pg.set("end,e", "", "str", "the ending delimiter");
   pg.set("mirror,m", "", "str", "mirror the delimiter");
 
-  // pg.set_pos();
+  pg.set_pos();
   // pg.set_stdin();
 
   int status {pg.parse()};
@@ -112,19 +114,6 @@ int program_options(Parg& pg)
   return 0;
 }
 
-void replace_all(std::string& str, std::string const& key, std::string const& val)
-{
-  size_t pos {0};
-
-  for (;;)
-  {
-    pos = str.find(key, pos);
-    if (pos == std::string::npos) break;
-    str.replace(pos, key.size(), val);
-    ++pos;
-  }
-}
-
 int start_m8(Parg& pg)
 {
   try
@@ -152,6 +141,17 @@ int start_m8(Parg& pg)
       return 0;
     }
 
+    // get input file name
+    auto positionals = pg.get_pos_vec();
+    if (! pg.get<bool>("interpreter"))
+    {
+      if (positionals.empty())
+      {
+        throw std::runtime_error("expected input file");
+      }
+      std::string file_name {positionals.at(0)};
+    }
+
     // set debug option
     m8.set_debug(pg.get<bool>("debug"));
 
@@ -170,10 +170,10 @@ int start_m8(Parg& pg)
       auto delim = pg.get<std::string>("mirror");
       auto rdelim = delim;
       std::reverse(std::begin(rdelim), std::end(rdelim));
-      replace_all(rdelim, "(", ")");
-      replace_all(rdelim, "[", "]");
-      replace_all(rdelim, "{", "}");
-      replace_all(rdelim, "<", ">");
+      rdelim = String::replace_all(rdelim, "(", ")");
+      rdelim = String::replace_all(rdelim, "[", "]");
+      rdelim = String::replace_all(rdelim, "{", "}");
+      rdelim = String::replace_all(rdelim, "<", ">");
       m8.set_delimits(delim, rdelim);
       Macros::m8_delim_start = delim;
       Macros::m8_delim_end = rdelim;
@@ -186,7 +186,17 @@ int start_m8(Parg& pg)
     }
 
     // parse
-    m8.parse(pg.get("file"), pg.get("output"));
+    if (pg.get<bool>("interpreter"))
+    {
+      m8.parse();
+    }
+    else
+    {
+      for (auto const& e : positionals)
+      {
+        m8.parse(e, pg.get("output"));
+      }
+    }
 
     if (! pg.get("output").empty())
     {
@@ -205,6 +215,10 @@ int start_m8(Parg& pg)
     // print out summary
     if (pg.get<bool>("summary"))
     {
+      if (! pg.get<bool>("interpreter"))
+      {
+        std::cerr << AEC::wrap("File: ", AEC::fg_magenta) << AEC::wrap(pg.get("output"), AEC::fg_green) << "\n";
+      }
       std::cerr << m8.summary();
     }
 
@@ -240,7 +254,7 @@ int main(int argc, char *argv[])
     time /= 1000000000;
     std::stringstream ss;
     ss << std::fixed << std::setprecision(4) << time;
-    std::cout << AEC::wrap("time: ", AEC::fg_magenta) << AEC::wrap(ss.str(), AEC::fg_green) << "\n";
+    std::cout << AEC::wrap("time: ", AEC::fg_magenta) << AEC::wrap(ss.str(), AEC::fg_green) << "\n\n";
   }
 
   return status;

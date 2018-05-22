@@ -12,12 +12,13 @@ namespace OB
 class Writer
 {
 public:
-  Writer(std::string file_name);
+  Writer();
   ~Writer();
 
-  void open();
+  void open(std::string const& file_name);
   void write(std::string const& str);
   void close();
+  void flush();
 
 private:
   std::string file_ext_ {".swp.m8"};

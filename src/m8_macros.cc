@@ -482,12 +482,14 @@ auto const fn_date = [&](auto& ctx) {
   {
     auto str = ctx.args.at(1);
     ss << std::put_time(&tm, str.c_str());
+    ctx.str = ss.str();
   }
   else
   {
     ss << std::asctime(&tm);
+    ctx.str = ss.str();
+    ctx.str.pop_back();
   }
-  ctx.str = ss.str();
   return 0;
 };
 
@@ -665,21 +667,23 @@ auto const fn_printc = [&](auto& ctx) {
   return 0;
 };
 
-auto const fn_def = [&](auto& ctx) {
-  var name = ctx.args.at(1);
+auto const fn_def_l = [&](auto& ctx) {
   var delim_start = m8_delim_start;
   var delim_end = m8_delim_end;
 
-  auto str = std::string();
-  auto ss = std::stringstream();
-  for (size_t i = 2; i < ctx.args.size(); ++i)
-  {
-    ss << ctx.args.at(i);
-  }
-  str = ss.str();
+  var name = ctx.args.at(1);
+  var str = ctx.args.at(2);
+
+  // auto str = std::string();
+  // auto ss = std::stringstream();
+  // for (size_t i = 3; i < ctx.args.size(); ++i)
+  // {
+  //   ss << ctx.args.at(i);
+  // }
+  // str = ss.str();
   db[name] = str;
 
-  m8.set_macro(name, "def-macro", str, "", [&, name, delim_start, delim_end](auto& ctx) {
+  m8.set_macro(name, "def-macro", "", "", [&, name, delim_start, delim_end](auto& ctx) {
     if (db.find(name) == db.end()) return -1;
     auto tmp = db[name];
 
@@ -700,6 +704,42 @@ auto const fn_def = [&](auto& ctx) {
     }
     tmp = String::replace_first(tmp, "`" + delim_start, delim_start);
     tmp = String::replace_last(tmp, delim_end + "`", delim_end);
+    ctx.str = tmp;
+    return 0;
+  });
+
+  return 0;
+};
+
+auto const fn_def = [&](auto& ctx) {
+  var delim_start = m8_delim_start;
+  var delim_end = m8_delim_end;
+
+  var name = ctx.args.at(1);
+  var info = ctx.args.at(2);
+  // TODO move this to set_macro()
+  std::string rx = "^" + ctx.args.at(3) + "$";
+  var str = ctx.args.at(4);
+  db[name] = str;
+
+  m8.set_macro(name, "def-macro", info, rx, [&, name, delim_start, delim_end](auto& ctx) {
+    if (db.find(name) == db.end()) return -1;
+    auto tmp = db[name];
+
+    auto arg_map = std::unordered_map<std::string, std::string>();
+    for (size_t i = 0; i < ctx.args.size(); ++i)
+    {
+      arg_map[std::to_string(i)] = ctx.args.at(i);
+    }
+
+    tmp = String::xformat(tmp, arg_map);
+    // if (String::ends_with(tmp, "\n\n"))
+    // {
+    //   tmp = String::replace_last(tmp, "\n\n", "\n");
+    // }
+    tmp = String::unescape(tmp);
+    tmp = String::replace_all(tmp, "`" + delim_start, delim_start);
+    tmp = String::replace_all(tmp, delim_end + "`", delim_end);
     ctx.str = tmp;
     return 0;
   });
@@ -793,7 +833,6 @@ auto const fn_script = [&](auto& ctx) {
   // if (ctx.cache.get(ckey, ctx.str)) return 0;
 
   var str = ctx.args.at(1);
-  std::cout << str << "\n";
   let path = std::string(".m8/.m8-script.tmp.m8");
   var ofile = std::ofstream(path);
   ofile << str;
@@ -859,6 +898,15 @@ auto const fn_test_regex = [&](auto& ctx) {
 lm fn_file_write = [&](var& ctx) {
   let file = ctx.args.at(1);
   let str = ctx.args.at(2);
+  std::ofstream ofile {file};
+  if (! ofile.is_open()) return -1;
+  ofile << str << "\n";
+  return 0;
+};
+
+lm fn_file_append = [&](var& ctx) {
+  let file = ctx.args.at(1);
+  let str = ctx.args.at(2);
   std::ofstream ofile {file, std::ios::app};
   if (! ofile.is_open()) return -1;
   ofile << str << "\n";
@@ -881,28 +929,10 @@ lm fn_file_write = [&](var& ctx) {
 //   return 0;
 //   });
 
-m8.set_macro("m8:file",
-  "current file name",
-  "",
-  "",
-  [&](auto& ctx) {
-  ctx.str = ctx.ifile;
-  return 0;
-  });
-
-m8.set_macro("m8:line",
-  "current line number",
-  "",
-  "",
-  [&](auto& ctx) {
-  ctx.str = std::to_string(ctx.line);
-  return 0;
-  });
-
 m8.set_macro("rand",
   "generate random number",
   "",
-  "",
+  "{empty}",
   [&](auto& ctx) {
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -913,7 +943,7 @@ m8.set_macro("rand",
 m8.set_macro("nano",
   "epoch time in nanoseconds",
   "",
-  "",
+  "{empty}",
   [&](auto& ctx) {
   auto tnano = std::chrono::system_clock::now().time_since_epoch();
   long int uuid = std::chrono::duration_cast<std::chrono::nanoseconds>(tnano).count();
@@ -940,151 +970,6 @@ m8.set_macro("substr",
   }
   ctx.str = str.substr(start, end);
   return 0;
-  });
-
-lm fn_test_hook_info = [&](auto& ctx) {
-  std::stringstream st;
-  st << ctx.args.at(1);
-  char t;
-  st >> t;
-
-  std::stringstream ss;
-
-  lm stringify_hooks = [&](auto t) {
-    if (auto h = m8.get_hooks(t))
-    {
-      for (auto const& e : *h)
-      {
-        ss << "k: " << e.key << "\nv: " << e.val << "\n";
-      }
-    }
-  };
-
-  if (t == 'b')
-  {
-    stringify_hooks(M8::Htype::begin);
-  }
-  else if (t == 'm')
-  {
-    stringify_hooks(M8::Htype::macro);
-  }
-  else if (t == 'r')
-  {
-    stringify_hooks(M8::Htype::res);
-  }
-  else if (t == 'e')
-  {
-    stringify_hooks(M8::Htype::end);
-  }
-  else
-  {
-    return -1;
-  }
-
-  ctx.str = ss.str();
-  return 0;
-};
-lm fn_test_hook_rm = [&](auto& ctx) {
-  std::stringstream ss;
-  ss << ctx.args.at(1);
-  char t;
-  ss >> t;
-  var s1 = ctx.args.at(2);
-
-  if (t == 'b')
-  {
-    m8.rm_hook(M8::Htype::begin, s1);
-  }
-  else if (t == 'm')
-  {
-    m8.rm_hook(M8::Htype::macro, s1);
-  }
-  else if (t == 'r')
-  {
-    m8.rm_hook(M8::Htype::res, s1);
-  }
-  else if (t == 'e')
-  {
-    m8.rm_hook(M8::Htype::end, s1);
-  }
-  else
-  {
-    return -1;
-  }
-  return 0;
-};
-lm fn_test_hook_add = [&](auto& ctx) {
-  std::stringstream ss;
-  ss << ctx.args.at(1);
-  char t;
-  ss >> t;
-  var s1 = ctx.args.at(2);
-  var s2 = ctx.args.at(3);
-
-  for (size_t i = 0; i < ctx.args.size(); ++i)
-  {
-    debugf(ctx.args.at(i))
-  }
-
-  if (t == 'b')
-  {
-    m8.set_hook(M8::Htype::begin, {s1, s2});
-  }
-  else if (t == 'm')
-  {
-    m8.set_hook(M8::Htype::macro, {s1, s2});
-  }
-  else if (t == 'r')
-  {
-    m8.set_hook(M8::Htype::res, {s1, s2});
-  }
-  else if (t == 'e')
-  {
-    m8.set_hook(M8::Htype::end, {s1, s2});
-  }
-  else
-  {
-    return -1;
-  }
-  return 0;
-};
-m8.set_macro("test:hook:add",
-  "test add hook macro",
-  "1[bre] str str",
-  {
-    {"{b}([bmre]{1}){ws}{!str_s}{ws}{!str_s}{e}", fn_test_hook_add},
-  });
-m8.set_macro("test:hook:rm",
-  "test remove hook macro",
-  "1[bre] str",
-  {
-    {"{b}([bmre]{1}){ws}{!str_s}{e}", fn_test_hook_rm},
-  });
-m8.set_macro("test:hook:info",
-  "test info hook macro",
-  "1[bre]",
-  {
-    {"{b}([bmre]{1}){e}", fn_test_hook_info},
-  });
-
-std::string const str_s {"'([^'\\\\]*(?:\\\\.[^'\\\\]*)*)'"};
-std::string const str_d {"\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\""};
-std::string const ws {"\\s+"};
-lm rg = [&](std::string str) {
-  std::stringstream ss; ss
-  << "^"
-  << str
-  << "$";
-  return ss.str();
-};
-m8.set_macro("test:regex",
-  "test overloading regexes",
-  "num",
-  {
-    {"^([0-9]{1})$", fn_test_regex},
-    {"^([0-9]{2})$", fn_test_regex},
-    {rg(str_s), fn_test_regex},
-    {rg(str_d), fn_test_regex},
   });
 
 m8.set_macro("test:parg",
@@ -1114,8 +999,10 @@ m8.set_macro("cpp:enum",
 m8.set_macro("version",
   "",
   "",
-  "",
-  fn_version);
+  {
+    {"{b}{!str_s}{e}", fn_version},
+    {"{b}{!str_d}{e}", fn_version},
+  });
 
 m8.set_macro("eq",
   "",
@@ -1149,9 +1036,11 @@ m8.set_macro("printc!",
 
 m8.set_macro("def",
   "define a macro",
-  "def <key> <val>",
-  "^(.+?)\\s+(?:M8!|)([^\\r]+?)(?:!8M|$)",
-  fn_def);
+  "{name} {info} {regex} {body}",
+  {
+    {"^(.+?)\\s+(?:M8!|)([^\\r]+?)(?:!8M|$)", fn_def_l},
+    {"{b}{!str_s}{ws}{!str_s}{ws}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def},
+  });
 
 m8.set_macro("c",
   "run c code snippet",
@@ -1231,12 +1120,20 @@ m8.set_macro("floor",
   "",
   fn_math_floor);
 
-m8.set_macro("out",
+m8.set_macro("file:write",
   "send output to file",
-  "{b}{!str}{ws}{!all}{e}",
+  "{str} {all}",
   {
     {"{b}{!str_s}{ws}{!all}{e}", fn_file_write},
     {"{b}{!str_d}{ws}{!all}{e}", fn_file_write},
+  });
+
+m8.set_macro("file:append",
+  "send output to file",
+  "{str} {all}",
+  {
+    {"{b}{!str_s}{ws}{!all}{e}", fn_file_append},
+    {"{b}{!str_d}{ws}{!all}{e}", fn_file_append},
   });
 
 m8.set_macro("in",
@@ -1246,69 +1143,72 @@ m8.set_macro("in",
   fn_in);
 
 m8.set_macro("round",
-  "round a decimal",
-  "round n",
-  "",
+  "round a number",
+  "{num}",
+  "{b}{!num}{e}",
   fn_math_round);
 
 m8.set_macro("date",
   "the current date timestamp",
   "date",
-  "",
-  fn_date);
+  {
+    {"{empty}", fn_date},
+    {"{b}{!str_s}{e}", fn_date},
+    {"{b}{!str_d}{e}", fn_date},
+  });
 
 m8.set_macro("abs",
   "absolute value of number",
-  "abs <num>",
-  "",
+  "{num}",
+  "{b}{!num}{e}",
   fn_math_abs);
 
 m8.set_macro("^",
   "the exponent operator",
-  "/ n1 n2",
-  "",
+  "{num} {num}",
+  "{b}{!num}{ws}{!num}{e}",
   fn_math_pow);
 
 m8.set_macro("%",
   "the modulo operator",
-  "% n1 n2",
-  "",
+  "{num} {num}",
+  "{b}{!num}{ws}{!num}{e}",
   fn_math_mod);
 
 m8.set_macro("/",
   "the division operator",
-  "/ n1 n2",
-  "",
+  "{num} {num}",
+  "{b}{!num}{ws}{!num}{e}",
   fn_math_divide);
 
 m8.set_macro("*",
   "the multiplication operator",
-  "* n1 n2",
-  "",
+  "{num} {num}",
+  "{b}{!num}{ws}{!num}{e}",
   fn_math_multiply);
 
 m8.set_macro("-",
   "the subtraction operator",
-  "- n1 n2",
-  "",
+  "{num} {num}",
+  "{b}{!num}{ws}{!num}{e}",
   fn_math_subtract);
 
 m8.set_macro("+",
   "the addition operator",
-  "+ n1 n2",
-  "",
+  "{num} {num}",
+  "{b}{!num}{ws}{!num}{e}",
   fn_math_add);
 
 m8.set_macro("nl",
   "returns a newline",
-  "nl",
-  "",
+  "{empty}",
+  "{empty}",
   fn_nl);
 
 m8.set_macro("nl!",
   "print a newline to stdout",
-  "!nl",
-  "",
+  "{empty}",
+  "{empty}",
   fn_stdout_nl);
 
 m8.set_macro("print!",
@@ -1319,8 +1219,8 @@ m8.set_macro("print!",
 
 m8.set_macro("term-width",
   "returns width of terminal",
-  "term-width",
-  "",
+  "{empty}",
+  "{empty}",
   fn_term_width);
 
 m8.set_macro("cat",

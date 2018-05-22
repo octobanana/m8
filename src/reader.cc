@@ -60,15 +60,20 @@ Reader::~Reader()
   }
 }
 
-void Reader::open_file(std::string file)
+void Reader::open(std::string const& file_name)
 {
-  ifile_.open(file);
+  ifile_.open(file_name);
   if (! ifile_.is_open())
   {
     throw std::runtime_error("could not open the input file");
   }
   lines_[0] = 0;
   readline_ = false;
+}
+
+std::string Reader::line()
+{
+  return line_;
 }
 
 bool Reader::next(std::string& str)
@@ -84,12 +89,14 @@ bool Reader::next(std::string& str)
     if (input == ".quit" || input == ".quit" || quit)
     {
       std::cout << "\n";
+      --row_;
       status = false;
     }
     else
     {
       linenoise::AddHistory(input.c_str());
       str = input;
+      line_ = str;
       status = true;
     }
     return status;
@@ -98,10 +105,12 @@ bool Reader::next(std::string& str)
   {
     if (std::getline(ifile_, str))
     {
+      line_ = str;
       status = true;
     }
     else
     {
+      --row_;
       status = false;
     }
     return status;

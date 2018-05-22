@@ -1,6 +1,9 @@
 #include "writer.hh"
 #include "crypto.hh"
 
+#include "ansi_escape_codes.hh"
+namespace AEC = OB::ANSI_Escape_Codes;
+
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -12,10 +15,8 @@ namespace fs = std::experimental::filesystem;
 namespace OB
 {
 
-Writer::Writer(std::string file_name):
-  file_name_ {file_name}
+Writer::Writer()
 {
-  fs::create_directories(".m8/swp");
 }
 
 Writer::~Writer()
@@ -31,8 +32,10 @@ Writer::~Writer()
   // }
 }
 
-void Writer::open()
+void Writer::open(std::string const& file_name)
 {
+  fs::create_directories(".m8/swp");
+  file_name_ = file_name;
   fs::path fp {file_name_};
   file_tmp_ = ".m8/swp/" + Crypto::sha256(fp) + file_ext_;
   fs::path p {file_tmp_};
@@ -45,7 +48,30 @@ void Writer::open()
 
 void Writer::write(std::string const& str)
 {
-  file_ << str;
+  if (file_name_.empty())
+  {
+    std::cout << str;
+    if (! str.empty() && str.back() != '\n')
+    {
+      std::cout << AEC::wrap("%\n", AEC::reverse) << std::flush;
+    }
+  }
+  else
+  {
+    file_ << str;
+  }
+}
+
+void Writer::flush()
+{
+  if (file_name_.empty())
+  {
+    std::cout << std::flush;
+  }
+  else
+  {
+    file_ << std::flush;
+  }
 }
 
 void Writer::close()
@@ -54,14 +80,6 @@ void Writer::close()
   {
     file_.close();
   }
-  // fs::path fp {file_name_};
-  // fs::path p1 {file_tmp_};
-  // fs::path p2 {file_name_};
-  // if (! p2.parent_path().empty())
-  // {
-  //   fs::create_directories(p2.parent_path());
-  // }
-  // fs::rename(p1, p2);
 }
 
 } // namespace OB

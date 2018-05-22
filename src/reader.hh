@@ -17,10 +17,11 @@ public:
   Reader();
   ~Reader();
 
-  void open_file(std::string file);
+  void open(std::string const& file_name);
   bool next(std::string& str);
   uint32_t row();
   uint32_t col();
+  std::string line();
 
 private:
   bool readline_ {true};
@@ -36,6 +37,8 @@ private:
   uint32_t row_ {0};
   // current column number
   uint32_t col_ {0};
+  // current line
+  std::string line_;
 
   // stores file position to line number
   std::map<size_t, uint32_t> lines_;
