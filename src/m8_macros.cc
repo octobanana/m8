@@ -978,11 +978,11 @@ m8.set_macro("test:parg",
   "^([^\\r]*)$",
   fn_test_parg);
 
-m8.set_macro("_def",
-  "",
-  "str str",
-  "^(.+)$",
-  fn_info);
+// m8.set_macro("_def",
+//   "",
+//   "str str",
+//   "^(.+)$",
+//   fn_info);
 
 m8.set_macro("info",
   "",
@@ -1038,8 +1038,8 @@ m8.set_macro("def",
   "define a macro",
   "{name} {info} {regex} {body}",
   {
-    {"^(.+?)\\s+(?:M8!|)([^\\r]+?)(?:!8M|$)", fn_def_l},
     {"{b}{!str_s}{ws}{!str_s}{ws}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def},
+    {"^(.+?)\\s+(?:M8!|)([^\\r]+?)(?:!8M|$)", fn_def_l},
   });
 
 m8.set_macro("c",

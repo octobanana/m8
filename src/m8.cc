@@ -322,6 +322,16 @@ void M8::set_debug(bool val)
   settings_.debug = val;
 }
 
+void M8::set_comment(std::string str)
+{
+  comment_ = str;
+}
+
+void M8::set_ignore(std::string str)
+{
+  ignore_ = str;
+}
+
 void M8::set_copy(bool val)
 {
   settings_.copy = val;
@@ -715,12 +725,12 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
     }
 
     // commented out line
+    if (! comment_.empty())
     {
-      std::string comment_str {"//M8"};
       auto pos = line.find_first_not_of(" \t");
       if (pos != std::string::npos)
       {
-        if (line.compare(pos, comment_str.size(), comment_str) == 0)
+        if (line.compare(pos, comment_.size(), comment_) == 0)
         {
           continue;
         }
@@ -1173,14 +1183,25 @@ invalid_arg:
                 }
               }
 
+              {
+              }
+
               // process macro
               int ec {0};
               Ctx ctx {t.res, t.match, "", nullptr};
               try
               {
-                // call core
-                if (it->second.type == Mtype::core)
+                // ignore matching names
+                std::smatch match;
+                if (std::regex_match(t.name, match, std::regex(ignore_)))
                 {
+                  ++stats_.ignored;
+                }
+
+                // call core
+                else if (it->second.type == Mtype::core)
+                {
+                  ++stats_.macro;
                   ctx.core = std::make_unique<Core_Ctx>(buf, r, w, _ifile, _ofile);
                   ec = run_internal(it->second.rx_fn.at(t.fn_index).second, ctx);
                 }
@@ -1188,22 +1209,23 @@ invalid_arg:
                 // call internal
                 else if (it->second.type == Mtype::internal)
                 {
+                  ++stats_.macro;
                   ec = run_internal(it->second.rx_fn.at(t.fn_index).second, ctx);
                 }
 
                 // call remote
                 else if (it->second.type == Mtype::remote)
                 {
+                  ++stats_.macro;
                   ec = run_remote(it->second, ctx);
                 }
 
                 // call external
                 else if (it->second.type == Mtype::external)
                 {
+                  ++stats_.macro;
                   ec = run_external(it->second, ctx);
                 }
-
-                ++stats_.macro;
               }
               catch (std::exception const& e)
               {

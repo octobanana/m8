@@ -119,6 +119,8 @@ public:
   void rm_hook(Htype t, std::string key);
 
   void set_debug(bool val);
+  void set_comment(std::string str);
+  void set_ignore(std::string str);
   void set_copy(bool val);
   void set_config(std::string file_name);
   void set_delimits(std::string const& delim_start, std::string const& delim_end);
@@ -139,6 +141,7 @@ private:
     bool debug {false};
     bool copy {false};
     bool summary {false};
+    bool ignore {false};
   }; // struct Settings
   Settings settings_;
 
@@ -146,7 +149,9 @@ private:
   {
     // general stats
     int macro {0};
+    int ignored {0};
     int warning {0};
+    int error {0};
     int pass {0};
 
     // macro stats
@@ -159,6 +164,8 @@ private:
 
   std::string delim_start_ {"[M8["};
   std::string delim_end_ {"]8M]"};
+  std::string ignore_;
+  std::string comment_;
 
   std::unordered_map<std::string, std::string> rx_grammar_ {
     {"b", "^"},

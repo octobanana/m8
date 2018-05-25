@@ -31,8 +31,8 @@ int program_options(Parg& pg)
 {
   std::string const v_major {"0"};
   std::string const v_minor {"5"};
-  std::string const v_patch {"6"};
-  std::string const date {"04.05.2018"};
+  std::string const v_patch {"7"};
+  std::string const date {"24.05.2018"};
   std::string const author {"Brett Robinson (octobanana) <octobanana.dev@gmail.com>"};
 
   pg.name("m8").version(v_major + "." + v_minor + "." + v_patch + " (" + date + ")");
@@ -76,6 +76,8 @@ int program_options(Parg& pg)
   pg.set("start,s", "", "str", "the starting delimiter");
   pg.set("end,e", "", "str", "the ending delimiter");
   pg.set("mirror,m", "", "str", "mirror the delimiter");
+  pg.set("ignore", "", "regex", "regex to ignore matching names");
+  pg.set("comment", "", "str", "comment symbol");
 
   pg.set_pos();
   // pg.set_stdin();
@@ -155,6 +157,15 @@ int start_m8(Parg& pg)
     // set debug option
     m8.set_debug(pg.get<bool>("debug"));
 
+    // set comment option
+    m8.set_comment(pg.get("comment"));
+
+    // set ignore option
+    if (pg.find("ignore"))
+    {
+      m8.set_ignore(pg.get("ignore"));
+    }
+
     // set readline option
     m8.set_readline(pg.get<bool>("interpreter"));
 
@@ -167,7 +178,11 @@ int start_m8(Parg& pg)
     // set start and end delimiters
     if (pg.find("mirror"))
     {
-      auto delim = pg.get<std::string>("mirror");
+      auto delim = pg.get("mirror");
+      if (delim.size() <= 1)
+      {
+        throw std::runtime_error("delimiter must be at least 2 chars long");
+      }
       auto rdelim = delim;
       std::reverse(std::begin(rdelim), std::end(rdelim));
       rdelim = String::replace_all(rdelim, "(", ")");
@@ -180,9 +195,19 @@ int start_m8(Parg& pg)
     }
     else if (pg.find("start") && pg.find("end"))
     {
-      m8.set_delimits(pg.get("start"), pg.get("end"));
-      Macros::m8_delim_start = pg.get("start");
-      Macros::m8_delim_end = pg.get("end");
+      auto delim_start = pg.get("start");
+      auto delim_end = pg.get("end");
+      if (delim_start.size() <= 1)
+      {
+        throw std::runtime_error("start delimiter must be at least 2 chars long");
+      }
+      if (delim_end.size() <= 1)
+      {
+        throw std::runtime_error("end delimiter must be at least 2 chars long");
+      }
+      m8.set_delimits(delim_start, delim_end);
+      Macros::m8_delim_start = delim_start;
+      Macros::m8_delim_end = delim_end;
     }
 
     // parse
