@@ -186,7 +186,7 @@ fn replace_all(std::string str, std::string const& key, std::string const& val)
     pos = str.find(key, pos);
     if (pos == std::string::npos) break;
     str.replace(pos, key.size(), val);
-    ++pos;
+    pos += val.size();
   }
   return str;
 }
