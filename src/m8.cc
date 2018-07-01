@@ -1365,7 +1365,10 @@ regular_char:
 
     if (settings_.debug)
     {
-      std::cerr << "AST:\n" << ast_.str() << "\n";
+      if (! ast_.ast.empty())
+      {
+        std::cerr << "AST:\n" << ast_.str() << "\n";
+      }
       ast_.clear();
     }
 
