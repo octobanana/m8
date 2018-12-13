@@ -29,6 +29,7 @@ using Parser = OB::Parser;
 #include <fstream>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <regex>
 #include <functional>
@@ -167,12 +168,15 @@ private:
   std::string ignore_;
   std::string comment_;
 
+  std::unordered_set<std::string> includes_;
+
   std::unordered_map<std::string, std::string> rx_grammar_ {
     {"b", "^"},
     {"e", "$"},
     {"ws", "\\s+"},
     {"empty", "^$"},
     {"!all", "([^\\r]*?)"},
+    {"!wrd", "([^\\s]+?)"},
     {"!num", "([\\-+]{0,1}[0-9]+(?:\\.[0-9]+)?(?:e[\\-+]{0,1}[0-9]+)?)"},
     // {"!int", "([0-9]+)"},
     // {"!dec", "([0-9]+\.[0-9]+)"},
@@ -193,6 +197,7 @@ private:
     Mtype type;
     std::string name;
     std::string info;
+    // TODO allow usage for each macro_fn
     std::string usage;
     std::vector<std::pair<std::string, macro_fn>> rx_fn;
     std::string url;

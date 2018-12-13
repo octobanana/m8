@@ -16,8 +16,8 @@ using Parg = OB::Parg;
 #include "ansi_escape_codes.hh"
 namespace AEC = OB::ANSI_Escape_Codes;
 
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
+#include <filesystem>
+namespace fs = std::filesystem;
 
 #include <string>
 #include <iomanip>
@@ -27,26 +27,32 @@ namespace fs = std::experimental::filesystem;
 int program_options(Parg& pg);
 int start_m8(Parg& pg);
 
+struct Version
+{
+  std::string const major {};
+  std::string const minor {};
+  std::string const patch {};
+}; // struct Version
+
 int program_options(Parg& pg)
 {
-  std::string const v_major {"0"};
-  std::string const v_minor {"5"};
-  std::string const v_patch {"7"};
-  std::string const date {"24.05.2018"};
+  Version v {"0", "5", "10"};
+  std::string const date {"30.10.2018"};
   std::string const author {"Brett Robinson (octobanana) <octobanana.dev@gmail.com>"};
 
-  pg.name("m8").version(v_major + "." + v_minor + "." + v_patch + " (" + date + ")");
+  pg.name("m8").version(v.major + "." + v.minor + "." + v.patch + " (" + date + ")");
 
   pg.description("a meta programming tool");
   pg.usage("[flags] [options] [--] [arguments]");
-  pg.usage("[-f 'input_file'] [-o 'output_file'] [-c 'config file'] [-s 'start_delim' -e 'end_delim' | -m 'mirror_delim'] [d]");
+  pg.usage("['input_file'] [-o 'output_file'] [-c 'config file'] [-s 'start_delim' -e 'end_delim' | -m 'mirror_delim'] [d]");
   pg.usage("[-v|--version]");
   pg.usage("[-h|--help]");
   pg.info("Exit Codes", {"0 -> normal", "1 -> error"});
   pg.info("Examples", {
-    pg.name() + "-f input_file -o ouput_file",
-    pg.name() + "-f input_file -o ouput_file -c ~/custom_path/.m8",
-    pg.name() + "-f input_file -o ouput_file -s '[[' -e ']]'",
+    pg.name() + "input_file -o ouput_file",
+    pg.name() + "input_file -o ouput_file -c ~/custom_path/.m8",
+    pg.name() + "input_file -o ouput_file -s '[[' -e ']]'",
+    pg.name() + "input_file -o ouput_file -m '[['",
     pg.name() + "--list",
     pg.name() + "--help",
     pg.name() + "--version",
@@ -65,6 +71,8 @@ int program_options(Parg& pg)
   pg.set("summary", "print out summary at end");
   pg.set("timer,t", "print out execution time in milliseconds");
   pg.set("color", "print output in color");
+  // TODO add flag to ignore empty lines
+  // pg.set("ignore-empty", "ignore empty lines");
 
   // singular options
   pg.set("info", "", "str", "view informatin on specific macro");
@@ -78,6 +86,8 @@ int program_options(Parg& pg)
   pg.set("mirror,m", "", "str", "mirror the delimiter");
   pg.set("ignore", "", "regex", "regex to ignore matching names");
   pg.set("comment", "", "str", "comment symbol");
+  // TODO add option to define variable
+  // pg.set("define,D", "", "str", "code to exec before parsing");
 
   pg.set_pos();
   // pg.set_stdin();
@@ -116,6 +126,62 @@ int program_options(Parg& pg)
   return 0;
 }
 
+std::string mirror_delim(std::string str)
+{
+  if (str.empty())
+  {
+    return {};
+  }
+
+  std::reverse(std::begin(str), std::end(str));
+
+  size_t const len {1};
+  for (size_t pos = 0;; ++pos)
+  {
+    pos = str.find_first_of("()[]{}<>", pos);
+
+    if (pos == std::string::npos)
+    {
+      break;
+    }
+
+    switch (str.at(pos))
+    {
+      case '(':
+        str.replace(pos, len, ")");
+        break;
+      case ')':
+        str.replace(pos, len, "(");
+        break;
+
+      case '[':
+        str.replace(pos, len, "]");
+        break;
+      case ']':
+        str.replace(pos, len, "[");
+        break;
+
+      case '{':
+        str.replace(pos, len, "}");
+        break;
+      case '}':
+        str.replace(pos, len, "{");
+        break;
+
+      case '<':
+        str.replace(pos, len, ">");
+        break;
+      case '>':
+        str.replace(pos, len, "<");
+        break;
+
+      default:
+        break;
+    }
+  }
+  return str;
+}
+
 int start_m8(Parg& pg)
 {
   try
@@ -141,17 +207,6 @@ int start_m8(Parg& pg)
     {
       std::cout << m8.macro_info(pg.get("info"));
       return 0;
-    }
-
-    // get input file name
-    auto positionals = pg.get_pos_vec();
-    if (! pg.get<bool>("interpreter"))
-    {
-      if (positionals.empty())
-      {
-        throw std::runtime_error("expected input file");
-      }
-      std::string file_name {positionals.at(0)};
     }
 
     // set debug option
@@ -183,12 +238,7 @@ int start_m8(Parg& pg)
       {
         throw std::runtime_error("delimiter must be at least 2 chars long");
       }
-      auto rdelim = delim;
-      std::reverse(std::begin(rdelim), std::end(rdelim));
-      rdelim = String::replace_all(rdelim, "(", ")");
-      rdelim = String::replace_all(rdelim, "[", "]");
-      rdelim = String::replace_all(rdelim, "{", "}");
-      rdelim = String::replace_all(rdelim, "<", ">");
+      auto rdelim = mirror_delim(delim);
       m8.set_delimits(delim, rdelim);
       Macros::m8_delim_start = delim;
       Macros::m8_delim_end = rdelim;
@@ -217,6 +267,11 @@ int start_m8(Parg& pg)
     }
     else
     {
+      auto positionals = pg.get_pos_vec();
+      if (positionals.empty())
+      {
+        throw std::runtime_error("expected input file");
+      }
       for (auto const& e : positionals)
       {
         m8.parse(e, pg.get("output"));

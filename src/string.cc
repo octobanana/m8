@@ -315,7 +315,7 @@ fn xformat(std::string str, std::unordered_map<std::string, std::string> args)
         }
       }
       // {0:*;\n;i:${BUILD_DIR}/[i]\n:0}
-      std::regex rx {"^:([*]{1});([^;]+?);([a-z0-9]{1}):([^:]+?):" + first_esc.str() + "$"};
+      std::regex rx {"^:([*]{1});([^;]+?);([a-z0-9]{1}):([^\\r]+?):" + first_esc.str() + "$"};
 
       if (std::regex_match(second, match_complex, rx))
       {
@@ -431,6 +431,44 @@ fn ends_with(std::string const& str, std::string const& val)
     return true;
   }
   return false;
+}
+
+fn uppercase(std::string const& str)
+-> std::string
+{
+  auto const to_upper = [](char& c) {
+    if (c >= 'a' && c <= 'z')
+    {
+      c += 'A' - 'a';
+    }
+    return c;
+  };
+
+  std::string s {str};
+  for (char& c : s)
+  {
+    c = to_upper(c);
+  }
+  return s;
+}
+
+fn lowercase(std::string const& str)
+-> std::string
+{
+  auto const to_lower = [](char& c) {
+    if (c >= 'A' && c <= 'Z')
+    {
+      c += 'a' - 'A';
+    }
+    return c;
+  };
+
+  std::string s {str};
+  for (char& c : s)
+  {
+    c = to_lower(c);
+  }
+  return s;
 }
 
 } // namespace String

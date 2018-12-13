@@ -58,7 +58,6 @@ target_link_libraries (
   stdc++fs
   crypto
   curl
-  # boost_serialization
 )
 
 install (TARGETS ${TARGET} DESTINATION "/usr/local/bin")

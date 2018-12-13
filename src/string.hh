@@ -57,6 +57,12 @@ fn starts_with(std::string const& str, std::string const& val)
 fn ends_with(std::string const& str, std::string const& val)
 -> bool;
 
+fn uppercase(std::string const& str)
+-> std::string;
+
+fn lowercase(std::string const& str)
+-> std::string;
+
 } // namespace String
 
 } // namespace OB

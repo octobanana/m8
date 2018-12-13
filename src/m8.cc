@@ -44,6 +44,7 @@ using Json = nlohmann::json;
 #include <chrono>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <regex>
 #include <functional>
@@ -73,6 +74,39 @@ M8::~M8()
 
 void M8::core_macros()
 {
+  set_core("m8:include_once",
+    "include a files contents once",
+    "{str}",
+    "{b}{!str_s}{e}",
+    [&](auto& ctx) {
+    auto str = ctx.args.at(1);
+    if (str.empty())
+    {
+      return -1;
+    }
+    try
+    {
+      auto const& name = ctx.args.at(1);
+
+      if (includes_.find(name) != includes_.end())
+      {
+        return 0;
+      }
+      includes_.emplace(name);
+
+      ctx.core->w.write(ctx.core->buf);
+      ctx.core->w.flush();
+      ctx.core->buf.clear();
+      parse(name, ctx.core->ofile);
+    }
+    catch (std::exception const& e)
+    {
+      ctx.err_msg = "an error occurred while parsing the included file";
+      return -1;
+    }
+    return 0;
+    });
+
   set_core("m8:include",
     "include a files contents",
     "{str}",
@@ -708,9 +742,11 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
     // check for empty line
     if (line.empty())
     {
+      // TODO add flag to ignore empty lines
       if (stk.empty())
       {
-        if (! _ofile.empty() && settings_.copy)
+        // if (! _ofile.empty() && settings_.copy)
+        if (settings_.copy)
         {
           w.write("\n");
         }
@@ -1163,6 +1199,7 @@ invalid_arg:
                 }
                 if (invalid_regex)
                 {
+                  // TODO fix, correct args not being listed out
                   std::cerr << error(t, _ifile, "invalid argument", "");
                   std::cerr
                   << delim_start_ << " "
@@ -1181,9 +1218,6 @@ invalid_arg:
                   }
                   throw std::runtime_error("invalid argument");
                 }
-              }
-
-              {
               }
 
               // process macro
@@ -1262,11 +1296,11 @@ invalid_arg:
               if (t.res.find(delim_start_) != std::string::npos)
               {
                 // remove escaped nl chars
-                t.res = String::replace_all(t.res, "\\\n", "");
+                // t.res = String::replace_all(t.res, "\\\n", "");
 
                 // remove all nl chars that follow delim_end
                 // this would normally be removed by the reader
-                t.res = String::replace_all(t.res, delim_end_ + "\n", delim_end_);
+                // t.res = String::replace_all(t.res, delim_end_ + "\n", delim_end_);
 
                 // TODO handle the same as if it was read from file
                 line.insert(i + delim_end_.size(), t.res);
@@ -1277,6 +1311,14 @@ invalid_arg:
               if (! stk.empty())
               {
                 stk.top().str += t.res;
+
+                if ((! t.res.empty()) && (i + delim_end_.size() - 1 == line.size() - 1))
+                {
+                  // account for when end delim is last char on line
+                  // add a newline char to buf
+                  // only if response is not empty
+                  stk.top().str += "\n";
+                }
               }
               else
               {
@@ -1289,15 +1331,25 @@ invalid_arg:
                 }
 
                 buf += t.res;
+                // std::cerr << "t.name: " << t.name << "\n";
+                // std::cerr << "i: " << i << "\n";
+                // std::cerr << "t.res: " << t.res << "\n";
 
-                // account for when end delim is last char on line
-                // add a newline char to buf
-                // only if response is not empty
                 if ((! t.res.empty()) && (i + delim_end_.size() - 1 == line.size() - 1))
                 {
+                  // account for when end delim is last char on line
+                  // add a newline char to buf
+                  // only if response is not empty
                   buf += "\n";
                 }
               }
+            }
+
+            // debug
+            if (settings_.debug)
+            {
+              std::cerr << "\nRes fmt:\n~" << t.res << "~\n";
+              std::cerr << "\nBuf fmt:\n~" << buf << "~\n";
             }
 
             if (stk.empty())

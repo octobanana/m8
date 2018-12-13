@@ -45,8 +45,8 @@ using Json = nlohmann::json;
 #include <utility>
 #include <random>
 
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
+#include <filesystem>
+namespace fs = std::filesystem;
 
 namespace Macros
 {
@@ -608,8 +608,8 @@ auto const fn_version = [&](auto& ctx) {
 };
 
 auto const fn_eq = [&](auto& ctx) {
-  var n1 = std::stod(ctx.args.at(1));
-  var n2 = std::stod(ctx.args.at(2));
+  var n1 = ctx.args.at(1);
+  var n2 = ctx.args.at(2);
   var res = std::string("0");
   if (n1 == n2)
   {
@@ -628,6 +628,15 @@ auto const fn_if_else = [&](auto& ctx) {
   else
   {
     ctx.str = ctx.args.at(3);
+  }
+  return 0;
+};
+
+auto const fn_if_else_s = [&](auto& ctx) {
+  var cond = std::stoi(ctx.args.at(1));
+  if (cond)
+  {
+    ctx.str = ctx.args.at(2);
   }
   return 0;
 };
@@ -737,7 +746,44 @@ auto const fn_def = [&](auto& ctx) {
     // {
     //   tmp = String::replace_last(tmp, "\n\n", "\n");
     // }
-    tmp = String::unescape(tmp);
+    // TODO should unescape be removed?
+    // tmp = String::unescape(tmp);
+    tmp = String::replace_all(tmp, "`" + delim_start, delim_start);
+    tmp = String::replace_all(tmp, delim_end + "`", delim_end);
+    ctx.str = tmp;
+    return 0;
+  });
+
+  return 0;
+};
+
+auto const fn_def_s = [&](auto& ctx) {
+  var delim_start = m8_delim_start;
+  var delim_end = m8_delim_end;
+
+  var name = ctx.args.at(1);
+  var info = "{args:all}";
+  std::string rx = "^{!all}$";
+  var str = ctx.args.at(2);
+  db[name] = str;
+
+  m8.set_macro(name, "def-macro", info, rx, [&, name, delim_start, delim_end](auto& ctx) {
+    if (db.find(name) == db.end()) return -1;
+    auto tmp = db[name];
+
+    auto arg_map = std::unordered_map<std::string, std::string>();
+    for (size_t i = 0; i < ctx.args.size(); ++i)
+    {
+      arg_map[std::to_string(i)] = ctx.args.at(i);
+    }
+
+    tmp = String::xformat(tmp, arg_map);
+    // if (String::ends_with(tmp, "\n\n"))
+    // {
+    //   tmp = String::replace_last(tmp, "\n\n", "\n");
+    // }
+    // TODO should unescape be removed?
+    // tmp = String::unescape(tmp);
     tmp = String::replace_all(tmp, "`" + delim_start, delim_start);
     tmp = String::replace_all(tmp, delim_end + "`", delim_end);
     ctx.str = tmp;
@@ -837,7 +883,7 @@ auto const fn_script = [&](auto& ctx) {
   var ofile = std::ofstream(path);
   ofile << str;
   ofile.close();
-  fs::permissions(path, fs::perms::owner_exec | fs::perms::add_perms);
+  fs::permissions(path, fs::perms::owner_exec, fs::perm_options::add);
   let status = exec(ctx.str, path);
   fs::remove(fs::path(path));
 
@@ -881,7 +927,7 @@ auto const fn_count = [&](auto& ctx) {
 auto const fn_cmp = [&](auto& ctx) {
   auto n1 = std::stod(ctx.args.at(1));
   auto n2 = std::stod(ctx.args.at(2));
-  int res = 0;
+  int res {0};
   if (n1 > n2) res = 1;
   else if (n1 == n2) res = 0;
   else if (n1 < n2) res = -1;
@@ -928,6 +974,67 @@ lm fn_file_append = [&](var& ctx) {
 //   ctx.str = str;
 //   return 0;
 //   });
+
+m8.set_macro("for",
+  "for each loop",
+  "{!all}",
+  "{b}{!all}{e}",
+  [&](auto& ctx) {
+  return 0;
+  });
+
+m8.set_macro("null",
+  "/dev/null",
+  "{!all}",
+  "{b}{!all}{e}",
+  [&](auto& ctx) {
+  return 0;
+  });
+
+m8.set_macro("assert",
+  "static assert",
+  "{!all}",
+  "{b}{!all}{e}",
+  [&](auto& ctx) {
+  auto lhs = ctx.args.at(1);
+  auto rhs = ctx.args.at(2);
+
+  return 0;
+  });
+
+m8.set_macro("lowercase",
+  "lower the case of a string",
+  "(\\d+){ws}(\\d+){ws}{!all}",
+  "{b}(\\d+){ws}(\\d+){ws}{!all}{e}",
+  [&](auto& ctx) {
+  var start = std::stoul(ctx.args.at(1));
+  var end = std::stoul(ctx.args.at(2));
+  var str = ctx.args.at(3);
+  if (start > str.size())
+  {
+    return -1;
+  }
+  if (end == 0) end = str.size() - 1;
+  ctx.str = str.replace(start, end, String::lowercase(str.substr(start, end)));
+  return 0;
+  });
+
+m8.set_macro("uppercase",
+  "upper the case of a string",
+  "(\\d+){ws}(\\d+){ws}{!all}",
+  "{b}(\\d+){ws}(\\d+){ws}{!all}{e}",
+  [&](auto& ctx) {
+  var start = std::stoul(ctx.args.at(1));
+  var end = std::stoul(ctx.args.at(2));
+  var str = ctx.args.at(3);
+  if (start > str.size())
+  {
+    return -1;
+  }
+  if (end == 0) end = str.size() - 1;
+  ctx.str = str.replace(start, end, String::uppercase(str.substr(start, end)));
+  return 0;
+  });
 
 m8.set_macro("rand",
   "generate random number",
@@ -1005,16 +1112,21 @@ m8.set_macro("version",
   });
 
 m8.set_macro("eq",
-  "",
-  "num num",
-  "^([\\d]{1})\\s([\\d]{1})$",
-  fn_eq);
+  "compare two values",
+  "{lhs} {rhs}",
+  {
+    {R"(^{!num}{ws}{!num}$)", fn_eq},
+    {R"(^{!str_s}{ws}{!str_s}$)", fn_eq},
+    {R"(^{!str_d}{ws}{!str_d}$)", fn_eq},
+  });
 
-m8.set_macro("M8::IF",
-  "",
-  "",
-  R"(^([01]{1})\s+([^\r]*)M8::ELSE\n([^\r]*)M8::END$)",
-  fn_if_else);
+m8.set_macro("m8:if",
+  "if else conditional statement",
+  "m8:if {0|1} {...} m8:else {...?} m8:end",
+  {
+    {R"(^([01]{1})\n([^\r]*)\nm8:else(?:\n([^\r]*))?\nm8:end$)", fn_if_else},
+    {R"(^([01]{1})\n([^\r]*)\nm8:end$)", fn_if_else_s},
+  });
 
 m8.set_macro("nop",
   "returns input untouched",
@@ -1034,12 +1146,16 @@ m8.set_macro("printc!",
   "",
   fn_printc);
 
+// TODO allow def same name with different args and append to fn overload
 m8.set_macro("def",
   "define a macro",
-  "{name} {info} {regex} {body}",
+  "{name:wrd} {body:str_s}\n  {name:str_s} {info:str_s} {regex:str_s} {body:all}",
   {
     {"{b}{!str_s}{ws}{!str_s}{ws}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def},
-    {"^(.+?)\\s+(?:M8!|)([^\\r]+?)(?:!8M|$)", fn_def_l},
+    {"{b}{!wrd}{ws}{!str_s}{ws}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def},
+    {"{b}{!wrd}{ws}(?:M8!|){!all}(?:!8M|{e})", fn_def_s},
+    // {"{b}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def_s},
+    // {"^(.+?)\\s+(?:M8!|)([^\\r]+?)(?:!8M|$)", fn_def_l},
   });
 
 m8.set_macro("c",
@@ -1073,10 +1189,13 @@ m8.set_macro("tmp",
   fn_template);
 
 m8.set_macro("cmp",
-  "",
-  "",
-  "",
-  fn_cmp);
+  "compare two values",
+  "{lhs} {rhs}",
+  {
+    {R"(^{!num}{ws}{!num}$)", fn_cmp},
+    // {R"(^{!str_s}{ws}{!str_s}$)", fn_cmp},
+    // {R"(^{!str_d}{ws}{!str_d}$)", fn_cmp},
+  });
 
 m8.set_macro("count",
   "count",
