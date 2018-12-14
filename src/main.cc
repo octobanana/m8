@@ -18,7 +18,7 @@ int start_m8(Parg& pg);
 
 int program_options(Parg& pg)
 {
-  pg.name("m8").version("0.3.0 (02.25.2018)");
+  pg.name("m8").version("0.2.0 (02.16.2018)");
   pg.description("a meta programming tool");
   pg.usage("[flags] [options] [--] [arguments]");
   pg.usage("[-f 'input_file'] [-o 'output_file'] [-c 'config file'] [-s 'start_delim'] [-e 'end_delim'] [d]");
