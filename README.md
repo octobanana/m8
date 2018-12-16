@@ -30,7 +30,7 @@ std::string secret {"123456"};
 ### Requirements
 * C++17 compiler
 * CMake >= 3.8
-* curl >= 1.67
+* curl >= 7.61.0
 * OpenSSL >= 1.1.0
 
 ### Dependencies
