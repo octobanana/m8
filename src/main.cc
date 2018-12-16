@@ -1,52 +1,50 @@
-#include "m8.hh"
-#include "m8_macros.hh"
-#include "user_macros.hh"
-#include "timer.hh"
-#include "crypto.hh"
+#include "m8/m8.hh"
+#include "m8/macros.hh"
+#include "m8/macros_custom.hh"
 
-#include "string.hh"
-namespace String = OB::String;
+#include "ob/timer.hh"
+#include "ob/crypto.hh"
 
-#include "term.hh"
-using Term = OB::Term;
+#include "ob/term.hh"
+namespace aec = OB::Term::ANSI_Escape_Codes;
 
-#include "parg.hh"
-using Parg = OB::Parg;
+#include "lib/parg.hh"
 
-#include "ansi_escape_codes.hh"
-namespace AEC = OB::ANSI_Escape_Codes;
-
-#include <filesystem>
-namespace fs = std::filesystem;
+#include <cstddef>
 
 #include <string>
 #include <iomanip>
 #include <iostream>
 #include <algorithm>
 
-int program_options(Parg& pg);
-int start_m8(Parg& pg);
+#include <filesystem>
+namespace fs = std::filesystem;
+
+int program_options(OB::Parg& pg);
+int start_m8(OB::Parg& pg);
+std::string mirror_delim(std::string str);
 
 struct Version
 {
-  std::string const major {};
-  std::string const minor {};
-  std::string const patch {};
+  std::string const major {"0"};
+  std::string const minor {"0"};
+  std::string const patch {"0"};
 }; // struct Version
 
-int program_options(Parg& pg)
+int program_options(OB::Parg& pg)
 {
-  Version v {"0", "5", "10"};
-  std::string const date {"30.10.2018"};
+  Version const v {"0", "6", "0"};
+  std::string const date {"16.12.2018"};
   std::string const author {"Brett Robinson (octobanana) <octobanana.dev@gmail.com>"};
 
   pg.name("m8").version(v.major + "." + v.minor + "." + v.patch + " (" + date + ")");
+  pg.description("A general-purpose preprocessor for metaprogramming.");
 
-  pg.description("a meta programming tool");
   pg.usage("[flags] [options] [--] [arguments]");
   pg.usage("['input_file'] [-o 'output_file'] [-c 'config file'] [-s 'start_delim' -e 'end_delim' | -m 'mirror_delim'] [d]");
   pg.usage("[-v|--version]");
   pg.usage("[-h|--help]");
+
   pg.info("Exit Codes", {"0 -> normal", "1 -> error"});
   pg.info("Examples", {
     pg.name() + "input_file -o ouput_file",
@@ -57,6 +55,7 @@ int program_options(Parg& pg)
     pg.name() + "--help",
     pg.name() + "--version",
   });
+
   pg.author(author);
 
   // singular flags
@@ -117,7 +116,7 @@ int program_options(Parg& pg)
     return 1;
   }
 
-  if (pg.get<bool>("color") && (! Term::is_term(STDOUT_FILENO) || ! Term::is_term(STDERR_FILENO)))
+  if (pg.get<bool>("color") && (! OB::Term::is_term(STDOUT_FILENO) || ! OB::Term::is_term(STDERR_FILENO)))
   {
     std::cout << "Error: flag 'color' can not be used on a non-interactive terminal\n";
     return -1;
@@ -135,8 +134,8 @@ std::string mirror_delim(std::string str)
 
   std::reverse(std::begin(str), std::end(str));
 
-  size_t const len {1};
-  for (size_t pos = 0;; ++pos)
+  std::size_t const len {1};
+  for (std::size_t pos = 0;; ++pos)
   {
     pos = str.find_first_of("()[]{}<>", pos);
 
@@ -182,7 +181,7 @@ std::string mirror_delim(std::string str)
   return str;
 }
 
-int start_m8(Parg& pg)
+int start_m8(OB::Parg& pg)
 {
   try
   {
@@ -190,10 +189,10 @@ int start_m8(Parg& pg)
     M8 m8;
 
     // add internal macros
-    Macros::m8_macros(m8);
+    Macros::macros(m8);
 
-    // add user macros
-    Macros::user_macros(m8);
+    // add cusom macros
+    Macros::macros_custom(m8);
 
     // list out all macros if --list option given
     if (pg.get<bool>("list"))
@@ -282,7 +281,7 @@ int start_m8(Parg& pg)
     {
       std::string ofile {pg.get("output")};
       fs::path fp {ofile};
-      std::string otmp {".m8/swp/" + Crypto::sha256(fp) + ".swp.m8"};
+      std::string otmp {".m8/swp/" + OB::Crypto::sha256(fp) + ".swp.m8"};
       fs::path p1 {otmp};
       fs::path p2 {ofile};
       if (! p2.parent_path().empty())
@@ -297,7 +296,7 @@ int start_m8(Parg& pg)
     {
       if (! pg.get<bool>("interpreter"))
       {
-        std::cerr << AEC::wrap("File: ", AEC::fg_magenta) << AEC::wrap(pg.get("output"), AEC::fg_green) << "\n";
+        std::cerr << aec::wrap("File: ", aec::fg_magenta) << aec::wrap(pg.get("output"), aec::fg_green) << "\n";
       }
       std::cerr << m8.summary();
     }
@@ -306,14 +305,14 @@ int start_m8(Parg& pg)
   }
   catch (std::exception const& e)
   {
-    std::cerr << AEC::wrap("Error: ", AEC::fg_red) << e.what() << "\n";
+    std::cerr << aec::wrap("Error: ", aec::fg_red) << e.what() << "\n";
     return 1;
   }
 }
 
 int main(int argc, char *argv[])
 {
-  Parg pg {argc, argv};
+  OB::Parg pg {argc, argv};
   int pstatus {program_options(pg)};
   if (pstatus > 0) return 0;
   if (pstatus < 0) return 1;
@@ -334,7 +333,7 @@ int main(int argc, char *argv[])
     time /= 1000000000;
     std::stringstream ss;
     ss << std::fixed << std::setprecision(4) << time;
-    std::cout << AEC::wrap("time: ", AEC::fg_magenta) << AEC::wrap(ss.str(), AEC::fg_green) << "\n\n";
+    std::cout << aec::wrap("time: ", aec::fg_magenta) << aec::wrap(ss.str(), aec::fg_green) << "\n\n";
   }
 
   return status;
