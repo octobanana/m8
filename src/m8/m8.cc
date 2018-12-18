@@ -1457,7 +1457,7 @@ int M8::run_remote(Macro const& macro, Ctx& ctx)
   data["args"] = ctx.args;
   api.req.data = data.dump();
 
-  std::cout << "Remote macro call -> " << macro.name << "\n";
+  std::cerr << "Remote macro call -> " << macro.name << "\n";
   std::future<int> send {std::async(std::launch::async, [&]() {
     api.run();
     int status_code = api.res.status;
@@ -1476,18 +1476,18 @@ int M8::run_remote(Macro const& macro, Ctx& ctx)
   do
   {
     fstatus = send.wait_for(std::chrono::milliseconds(250));
-    std::cout << "." << std::flush;
+    std::cerr << "." << std::flush;
   }
   while (fstatus != std::future_status::ready);
 
   int ec = send.get();
   if (ec == 0)
   {
-    std::cout << "\033[2K\r" << "Success: remote call\n";
+    std::cerr << "\033[2K\r" << "Success: remote call\n";
   }
   else
   {
-    std::cout << "\033[2K\r" << "Error: remote call\n";
+    std::cerr << "\033[2K\r" << "Error: remote call\n";
   }
 
   return ec;

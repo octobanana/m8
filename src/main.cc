@@ -95,30 +95,30 @@ int program_options(OB::Parg& pg)
   // uncomment if at least one argument is expected
   if (status > 0 && pg.get_stdin().empty())
   {
-    std::cout << pg.help() << "\n";
-    std::cout << "Error: " << "expected arguments" << "\n";
+    std::cerr << pg.help() << "\n";
+    std::cerr << "Error: " << "expected arguments" << "\n";
     return -1;
   }
   if (status < 0)
   {
-    std::cout << pg.help() << "\n";
-    std::cout << "Error: " << pg.error() << "\n";
+    std::cerr << pg.help() << "\n";
+    std::cerr << "Error: " << pg.error() << "\n";
     return -1;
   }
   if (pg.get<bool>("help"))
   {
-    std::cout << pg.help();
+    std::cerr << pg.help();
     return 1;
   }
   if (pg.get<bool>("version"))
   {
-    std::cout << pg.name() << " v" << pg.version() << "\n";
+    std::cerr << pg.name() << " v" << pg.version() << "\n";
     return 1;
   }
 
   if (pg.get<bool>("color") && (! OB::Term::is_term(STDOUT_FILENO) || ! OB::Term::is_term(STDERR_FILENO)))
   {
-    std::cout << "Error: flag 'color' can not be used on a non-interactive terminal\n";
+    std::cerr << "Error: flag 'color' can not be used on a non-interactive terminal\n";
     return -1;
   }
 
@@ -333,7 +333,7 @@ int main(int argc, char *argv[])
     time /= 1000000000;
     std::stringstream ss;
     ss << std::fixed << std::setprecision(4) << time;
-    std::cout << aec::wrap("time: ", aec::fg_magenta) << aec::wrap(ss.str(), aec::fg_green) << "\n\n";
+    std::cerr << aec::wrap("time: ", aec::fg_magenta) << aec::wrap(ss.str(), aec::fg_green) << "\n\n";
   }
 
   return status;
