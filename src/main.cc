@@ -41,14 +41,15 @@ int program_options(OB::Parg& pg)
   pg.description("A general-purpose preprocessor for metaprogramming.");
 
   pg.usage("[flags] [options] [--] [arguments]");
-  pg.usage("['input_file'] [-o 'output_file'] [-c 'config file'] [-s 'start_delim' -e 'end_delim' | -m 'mirror_delim'] [d]");
+  pg.usage("['input_file'] [-o|--output 'output_file'] [-c|--config 'config_file'] [[-s|--start 'start_delim'] [-e|--end 'end_delim'] | [-m|--mirror 'mirror_delim']] [--comment 'str'] [--summary] [-t|--timer] [-d|--debug]");
+  pg.usage("[-i|--interpreter] [-c|--config 'config_file'] [[-s|--start 'start_delim'] [-e|--end 'end_delim'] | [-m|--mirror 'mirror_delim']] [--comment 'str'] [--summary] [-t|--timer] [-d|--debug]");
   pg.usage("[-v|--version]");
   pg.usage("[-h|--help]");
 
   pg.info("Exit Codes", {"0 -> normal", "1 -> error"});
   pg.info("Examples", {
     pg.name() + "input_file -o ouput_file",
-    pg.name() + "input_file -o ouput_file -c ~/custom_path/.m8",
+    pg.name() + "input_file -o ouput_file -c ~/custom_path/json.m8",
     pg.name() + "input_file -o ouput_file -s '[[' -e ']]'",
     pg.name() + "input_file -o ouput_file -m '[['",
     pg.name() + "--list",
@@ -78,7 +79,6 @@ int program_options(OB::Parg& pg)
 
   // combinable options
   pg.set("config,c", "", "file_name", "the config file");
-  pg.set("file,f", "", "file_name", "the input file");
   pg.set("output,o", "", "file_name", "the output file");
   pg.set("start,s", "", "str", "the starting delimiter");
   pg.set("end,e", "", "str", "the ending delimiter");
