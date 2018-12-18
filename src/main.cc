@@ -41,20 +41,34 @@ int program_options(OB::Parg& pg)
   pg.description("A general-purpose preprocessor for metaprogramming.");
 
   pg.usage("[flags] [options] [--] [arguments]");
+
   pg.usage("['input_file'] [-o|--output 'output_file'] [-c|--config 'config_file'] [[-s|--start 'start_delim'] [-e|--end 'end_delim'] | [-m|--mirror 'mirror_delim']] [--comment 'str'] [--summary] [-t|--timer] [-d|--debug]");
-  pg.usage("[-i|--interpreter] [-c|--config 'config_file'] [[-s|--start 'start_delim'] [-e|--end 'end_delim'] | [-m|--mirror 'mirror_delim']] [--comment 'str'] [--summary] [-t|--timer] [-d|--debug]");
+
+  pg.usage("[-i|--interactive] [-c|--config 'config_file'] [[-s|--start 'start_delim'] [-e|--end 'end_delim'] | [-m|--mirror 'mirror_delim']] [--comment 'str'] [--summary] [-t|--timer] [-d|--debug]");
+
   pg.usage("[-v|--version]");
   pg.usage("[-h|--help]");
 
   pg.info("Exit Codes", {"0 -> normal", "1 -> error"});
+
   pg.info("Examples", {
-    pg.name() + "input_file -o ouput_file",
-    pg.name() + "input_file -o ouput_file -c ~/custom_path/json.m8",
-    pg.name() + "input_file -o ouput_file -s '[[' -e ']]'",
-    pg.name() + "input_file -o ouput_file -m '[['",
-    pg.name() + "--list",
-    pg.name() + "--help",
-    pg.name() + "--version",
+    pg.name() + " 'input_file'",
+    pg.name() + " 'input_file' --output 'ouput_file'",
+    pg.name() + " 'input_file' --output 'ouput_file' --start '[[' --end ']]'",
+    pg.name() + " 'input_file' --output 'ouput_file' --mirror '[['",
+    pg.name() + " --interactive --mirror '[['",
+    pg.name() + " --info 'built_in'",
+    pg.name() + " --list",
+    pg.name() + " --help",
+    pg.name() + " --version",
+  });
+
+  pg.info("Repository", {
+    "https://github.com/octobanana/m8.git",
+  });
+
+  pg.info("Homepage", {
+    "https://octobanana.com/software/m8",
   });
 
   pg.author(author);
@@ -66,7 +80,7 @@ int program_options(OB::Parg& pg)
 
   // combinable flags
   pg.set("debug,d", "print out debug information, useful for debugging macro regexes");
-  pg.set("interpreter,i", "start the interpreter in readline mode");
+  pg.set("interactive,i", "run in interactive mode");
   pg.set("no-copy", "do not copy outside text");
   pg.set("summary", "print out summary at end");
   pg.set("timer,t", "print out execution time in milliseconds");
@@ -92,33 +106,44 @@ int program_options(OB::Parg& pg)
   // pg.set_stdin();
 
   int status {pg.parse()};
-  // uncomment if at least one argument is expected
+
   if (status > 0 && pg.get_stdin().empty())
   {
     std::cerr << pg.help() << "\n";
     std::cerr << "Error: " << "expected arguments" << "\n";
     return -1;
   }
+
   if (status < 0)
   {
     std::cerr << pg.help() << "\n";
     std::cerr << "Error: " << pg.error() << "\n";
     return -1;
   }
+
   if (pg.get<bool>("help"))
   {
     std::cerr << pg.help();
     return 1;
   }
+
   if (pg.get<bool>("version"))
   {
     std::cerr << pg.name() << " v" << pg.version() << "\n";
     return 1;
   }
 
+  if (pg.find("interactive") && ! pg.get_pos_vec().empty())
+  {
+    std::cerr << pg.help() << "\n";
+    std::cerr << "Error: " << "pick either '--interactive' mode or file mode\n";
+    return -1;
+  }
+
   if (pg.get<bool>("color") && (! OB::Term::is_term(STDOUT_FILENO) || ! OB::Term::is_term(STDERR_FILENO)))
   {
-    std::cerr << "Error: flag 'color' can not be used on a non-interactive terminal\n";
+    std::cerr << pg.help() << "\n";
+    std::cerr << "Error: " << "flag 'color' can not be used on a non-interactive terminal\n";
     return -1;
   }
 
@@ -221,7 +246,7 @@ int start_m8(OB::Parg& pg)
     }
 
     // set readline option
-    m8.set_readline(pg.get<bool>("interpreter"));
+    m8.set_readline(pg.get<bool>("interactive"));
 
     // set config file
     m8.set_config(pg.get("config"));
@@ -260,41 +285,43 @@ int start_m8(OB::Parg& pg)
     }
 
     // parse
-    if (pg.get<bool>("interpreter"))
+    if (pg.get<bool>("interactive"))
     {
       m8.parse();
     }
     else
     {
-      auto positionals = pg.get_pos_vec();
+      auto const positionals = pg.get_pos_vec();
+
       if (positionals.empty())
       {
         throw std::runtime_error("expected input file");
       }
+
       for (auto const& e : positionals)
       {
         m8.parse(e, pg.get("output"));
       }
-    }
 
-    if (! pg.get("output").empty())
-    {
-      std::string ofile {pg.get("output")};
-      fs::path fp {ofile};
-      std::string otmp {".m8/swp/" + OB::Crypto::sha256(fp) + ".swp.m8"};
-      fs::path p1 {otmp};
-      fs::path p2 {ofile};
-      if (! p2.parent_path().empty())
+      if (! pg.get("output").empty())
       {
-        fs::create_directories(p2.parent_path());
+        std::string ofile {pg.get("output")};
+        fs::path fp {ofile};
+        std::string otmp {".m8/swp/" + OB::Crypto::sha256(fp) + ".swp.m8"};
+        fs::path p1 {otmp};
+        fs::path p2 {ofile};
+        if (! p2.parent_path().empty())
+        {
+          fs::create_directories(p2.parent_path());
+        }
+        fs::rename(p1, p2);
       }
-      fs::rename(p1, p2);
     }
 
     // print out summary
     if (pg.get<bool>("summary"))
     {
-      if (! pg.get<bool>("interpreter") && pg.find("output"))
+      if (! pg.get<bool>("interactive") && pg.find("output"))
       {
         std::cerr << aec::wrap("File: ", aec::fg_magenta) << aec::wrap(pg.get("output"), aec::fg_green) << "\n";
       }
