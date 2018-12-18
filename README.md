@@ -3,22 +3,40 @@ A general-purpose preprocessor for metaprogramming.
 
 ## About
 M8 is a command line tool for preprocessing text files.
-It executes macros that match a defined regex, running a C++ function or external program, and replaces the macro call with the response string.
+Its syntax is customizable, and easy to distinguish from its surrounding text.
+Custom macros can be added, allowing it to be specialized for various uses.
+M8 executes macros that match a defined regex, running either a built-in macro,
+an external program, or a remote API, and replaces the call point with
+the response string.
 
-## Real World Example
-The following is a short illustration of a problem that M8 could help solve.  
-An example of a common problem developers face is the handling of secrets within source code, such as api keys. The keys are usually kept out of the version controlled source. After checking out the repo, and obtaining the keys, one could manually copy them into the source code, or read them from a config file at runtime. M8 can help simplify this process.  
-An M8 macro can be written to read a key from a shell environment variable, and insert it into the source code at the desired location. The process would be the following, checkout the repo, obtain the secrets as environment variables, and run M8 on the corresponding files. This workflow keeps the secrets seperate, but allows putting it altogether in a working environment quickly.  
-There is a builtin macro in M8 that does exactly this. If the environment variable was named __SECRETKEY__, and the destination was a c++ std::string variable, the calling macro would look like the following:  
-```cpp
-// the environment variable
-// SECRETKEY="123456"
+## A Brief Tour
+Use the built-in 'def' macro to define a new macro called 'hello' that has an
+argument regex that captures a single word.
 
-// before processing with M8, safe to commit to version control
-std::string secret {"[M8[env SECRETKEY]8M]"};
+The file `hello.m8`:
+```
+[M8[ def hello 'str' '(\w+)' Hello, {1}! ]8M]
+The output: [M8[ hello octobanana ]8M]
+```
 
-// after processing with M8
-std::string secret {"123456"};
+Processing the file through M8 as `m8 hello.m8` will output:
+```
+The output: Hello, octobanana!
+```
+
+Define a new macro called 'name' that returns a static string and pass it to
+the 'hello' macro.
+
+The file `hello.m8`:
+```
+[M8[ def name octobanana ]8M]
+[M8[ def hello 'str' '(\w+)' Hello, {1}! ]8M]
+The output: [M8[ hello [M8[ name ]8M] ]8M]
+```
+
+Processing the file through M8 as `m8 hello.m8` will output:
+```
+The output: Hello, octobanana!
 ```
 
 ## Build
@@ -59,10 +77,10 @@ To install in debug mode, run the script with the `--debug` flag.
 
 ## Config
 The configuration file is a json file containing the definitions for external macros. An example config file is located in `./config/m8.json`.  
-The default location for the config file is `~/.m8.json`.  
+The default location for the config file is `~/.m8.json`.
 
 ## Syntax
-The grammer for a macro is as follows:  
+The grammer for a macro is as follows:
 ```
 macro       : [delim_start][name] [args][delim_end]
 delim_start : a unique string of characters | integers | symbols
@@ -71,8 +89,12 @@ args        : the arguments to be passed to the macro
 delim_end   : a unique string of characters | integers | symbols
 ```
 
-The delimiters can be changed with the __--start__ and __--end__ flags at runtime.  
-Inbetween the delimiters is the macro name and arguments seperated by a single space character. How the arguments are passed depends on how the macros regex is defined. The regex uses capture groups to parse the arguments sent to the macro.  
+The delimiters can be changed with the `--start` and `--end` or `--mirror` flags at runtime.
+The `--mirror` option takes a starting delimiter, creating an end delimiter by
+mirroring the input. For example, `--mirror '[('` will use `[(` as the start delimiter, and
+`)]` as the end delimiter.
+
+Inbetween the delimiters is the macro name and arguments seperated by a single space character. How the arguments are passed depends on how the macros regex is defined. The regex uses capture groups to parse the arguments sent to the macro.
 
 An example macro with a regex of `([0-9]+) ([0-9]+)`:
 ```
@@ -84,15 +106,68 @@ delim_end   : "]]"
 ```
 
 ## Usage
-After building and installing M8, try running it on the `./examples/basic/src/main_m8.cc` file.
+Show program version.
 ```
-cd ./examples/basic/src
-m8 main_m8.cc
+m8 --version'
 ```
 
-List out built-in macros:
+Show program help.
+```
+m8 --help'
+```
+
+Show all built-in macros.
 ```
 m8 --list
+```
+
+Show information on a specific built-in macros.
+```
+m8 --info 'macro-name'
+```
+
+Process a file and print the output to stdout.
+```
+m8 'input-file'
+```
+
+Process a file and print the output to stdout, printing a summary out at the
+end.
+```
+m8 'input-file' --summary
+```
+
+Process a file and print the output to stdout, printing out to stderr the
+amount of time it took to run in seconds.
+```
+m8 'input-file' --timer
+```
+
+Process a file and print the output to stdout, printing debug information to
+stderr.
+```
+m8 'input-file' --debug
+```
+
+Process a file and print the output to stdout, using custom delimiters.
+```
+m8 'input-file' --start '[[' --end ']]'
+```
+
+Process a file and print the output to stdout, using custom mirrored delimiter.
+```
+m8 'input-file' --mirror '[('
+```
+
+Process a file and save the output to a file.
+```
+m8 'input-file' --output 'output-file'
+```
+
+Process a file and print the output to a file, while ignoring lines starting
+with '//' using the `--comment` option.
+```
+m8 'input-file' --output 'output-file' --comment '//'
 ```
 
 ### Note
@@ -103,43 +178,43 @@ There are several examples located in the `./example` directory.
 
 ## Built-In Macros
 A list of some of the builtin/example macros:
-* __env__ -> gets an environment variable
-* __sh__ -> returns the output of a shell command
-* __file__ -> reads in the contents of a file
-* __repeat__ -> repeats a given string __n__ number of times
+* __def__ -> define a new macro
+* __env__ -> get an environment variable
+* __sh__ -> execute and return the output of a shell command
+* __file__ -> read in the contents of a file
+* __repeat__ -> repeat a given string a specific number of times
 
 ## Extending
-There are three types of macros, internal, external, and remote.  
-
-__External__ macros can be written in any language, with their interface defined in m8's json config file.  
-
-__Remote__ macros can be any http server, with their interface defined in m8's json config file as well.  
-
-__Internal__ macros are defined within m8, written in c++.  
+There are three types of macros, internal, external, and remote.
+* __External__ macros can be written in any language, with their interface defined in m8's json config file.
+* __Remote__ macros can be any http server, with their interface defined in m8's json config file as well.
+* __Internal__ macros are defined within m8, written in c++.
 
 ### External Program Macro
 M8 can run external programs, so macros can be written in any language.  
-Adding external macros do not require any recompiling.  
-To add a new external macro, define a new macro object in the config file.  
+Adding external macros do not require any recompiling.
+
+To add a new external macro, define a new macro object in the config file:
 ```json
 {
   "macros": [
     {
       "name": "program_name",
       "info": "describe what the macro does",
-      "usage": "program_name <args>",
+      "usage": "describe the parameters if any, ex 'name:string age:int'",
       "regex": "^(.*)$"
     }
   ]
 }
 ```
+
 Requirements of an external program:
 * should exist and be in your shell path
 * able to parse and read the captured regex arguments that are sent to it
 * print the output string to stdout
 
 ### Remote Program Macro
-Remote macros are defined similar to an external macro.
+Remote macros are defined similar to an external macro:
 ```json
 {
   "macros": [
@@ -153,10 +228,12 @@ Remote macros are defined similar to an external macro.
   ]
 }
 ```
+
 The difference between defining an external and remote macro is the addition of the url parameter.  
 The url should point to an http/https server that can handle the defined macro.  
 When a remote macro runs, it sends a json object to the remote server.
-The json request sent to the server will contain the following:  
+
+The json request sent to the server will contain the following:
 ```json
 {
   "name": "program_name",
@@ -169,7 +246,8 @@ The json request sent to the server will contain the following:
   ]
 }
 ```
-The server should read the name and check if it exists, if it does, process the apropriate macro call, reading the arguments if necessary from the array of strings called args. Lastly, send back the response string in plain text in the body. Any other status code than 200 will be interpreted as an error.  
+
+The server should read the name and check if it exists, if it does, process the apropriate macro call, reading the arguments if necessary from the array of strings called args. Lastly, send back the response string in plain text in the body. Any other status code than 200 will be interpreted as an error.
 
 Requirements of a server:
 * accept a json object
@@ -178,7 +256,7 @@ Requirements of a server:
 
 ### Internal C++ Macro
 Let's create a new macro that will output a c++ comment block with the authors name, timestamp, version number and description.  
-The file can be any file type, I'll use c++ as an example.  
+The file can be any file type, I'll use c++ as an example.
 
 Create a new file called test.cc:
 ```cpp
@@ -194,7 +272,7 @@ int main()
 ```
 
 Now let's define our macro.  
-The `./src/m8/macros_custom.cc` file is where custom macros can be defined.
+The `./src/m8/macros_custom.cc` file is where custom macros can be defined:
 ```cpp
 void macros(M8& m8)
 {
@@ -209,7 +287,7 @@ void macros(M8& m8)
 }
 ```
 
-Now to write the lambda function.  
+Now to write the lambda function:
 ```cpp
 // ctx -> a struct containing the following:
 //   str -> the response string
