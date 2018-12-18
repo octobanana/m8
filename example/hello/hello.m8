@@ -1,0 +1,32 @@
+use the following to process this file:
+  m8 hello.m8
+
+using the 'def' macro
+usage: def name body
+use 'def' to define a new macro called 'name' that returns 'octobanana'
+
+[M8[ def name octobanana ]8M]
+
+use the new macro 'name' to insert the defined value
+hello, [M8[ name ]8M]!
+
+using the 'def' macro overload
+usage: def name 'info' 'regex' body
+use 'def' to define a new macro called 'hello'
+set its usage description to 'name'
+set its argument regex to '(\w+)'
+  '(\w+)' match a single word
+  '()' denotes a capture group
+  '\w' matches a word character
+  '+' is a quantifier of one or more
+set the templated return body to 'hello, {1}!'
+  where '{}' denotes a template parameter
+  '{0}' contains the full regex match
+  '{1}' contains the first capture group match
+
+[M8[ def hello 'str' '(\w+)'
+hello, {1}!
+]8M]
+
+use the new macro 'hello' passing the 'name' macro as an argument
+[M8[ hello [M8[ name ]8M] ]8M]
