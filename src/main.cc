@@ -294,7 +294,7 @@ int start_m8(OB::Parg& pg)
     // print out summary
     if (pg.get<bool>("summary"))
     {
-      if (! pg.get<bool>("interpreter"))
+      if (! pg.get<bool>("interpreter") && pg.find("output"))
       {
         std::cerr << aec::wrap("File: ", aec::fg_magenta) << aec::wrap(pg.get("output"), aec::fg_green) << "\n";
       }
