@@ -1049,27 +1049,24 @@ m8.set_macro("cpp:enum",
 
 m8.set_macro("version",
   "",
-  "",
   {
-    {"{b}{!str_s}{e}", fn_version},
-    {"{b}{!str_d}{e}", fn_version},
+    M8::macro_t("", "{b}{!str_s}{e}", fn_version),
+    M8::macro_t("", "{b}{!str_d}{e}", fn_version),
   });
 
 m8.set_macro("eq",
   "compare two values",
-  "{lhs} {rhs}",
   {
-    {R"(^{!num}{ws}{!num}$)", fn_eq},
-    {R"(^{!str_s}{ws}{!str_s}$)", fn_eq},
-    {R"(^{!str_d}{ws}{!str_d}$)", fn_eq},
+    M8::macro_t("{lhs} {rhs}", R"(^{!num}{ws}{!num}$)", fn_eq),
+    M8::macro_t("{lhs} {rhs}", R"(^{!str_s}{ws}{!str_s}$)", fn_eq),
+    M8::macro_t("{lhs} {rhs}", R"(^{!str_d}{ws}{!str_d}$)", fn_eq),
   });
 
 m8.set_macro("m8:if",
   "if else conditional statement",
-  "m8:if {0|1} {...} m8:else {...?} m8:end",
   {
-    {R"(^([01]{1})\n([^\r]*)\nm8:else(?:\n([^\r]*))?\nm8:end$)", fn_if_else},
-    {R"(^([01]{1})\n([^\r]*)\nm8:end$)", fn_if_else_s},
+    M8::macro_t("m8:if {0|1} {...} m8:else {...?} m8:end", R"(^([01]{1})\n([^\r]*)\nm8:else(?:\n([^\r]*))?\nm8:end$)", fn_if_else),
+    M8::macro_t("m8:if {0|1} {...} m8:else {...?} m8:end", R"(^([01]{1})\n([^\r]*)\nm8:end$)", fn_if_else_s),
   });
 
 m8.set_macro("nop",
@@ -1093,11 +1090,10 @@ m8.set_macro("printc!",
 // TODO allow def same name with different args and append to fn overload
 m8.set_macro("def",
   "define a macro",
-  "{name:wrd} {body:str_s}\n  {name:str_s} {info:str_s} {regex:str_s} {body:all}",
   {
-    {"{b}{!str_s}{ws}{!str_s}{ws}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def},
-    {"{b}{!wrd}{ws}{!str_s}{ws}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def},
-    {"{b}{!wrd}{ws}(?:M8!|){!all}(?:!8M|{e})", fn_def_s},
+    M8::macro_t("{name:str_s} {info:str_s} {regex:str_s} {body:all}", "{b}{!str_s}{ws}{!str_s}{ws}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def),
+    M8::macro_t("{name:wrd} {info:str_s} {regex:str_s} {body:all}", "{b}{!wrd}{ws}{!str_s}{ws}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def),
+    M8::macro_t("{name:wrd} {body:all}", "{b}{!wrd}{ws}(?:M8!|){!all}(?:!8M|{e})", fn_def_s),
     // {"{b}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def_s},
     // {"^(.+?)\\s+(?:M8!|)([^\\r]+?)(?:!8M|$)", fn_def_l},
   });
@@ -1134,9 +1130,8 @@ m8.set_macro("tmp",
 
 m8.set_macro("cmp",
   "compare two values",
-  "{lhs} {rhs}",
   {
-    {R"(^{!num}{ws}{!num}$)", fn_cmp},
+    M8::macro_t("{lhs} {rhs}", R"(^{!num}{ws}{!num}$)", fn_cmp),
     // {R"(^{!str_s}{ws}{!str_s}$)", fn_cmp},
     // {R"(^{!str_d}{ws}{!str_d}$)", fn_cmp},
   });
@@ -1185,18 +1180,16 @@ m8.set_macro("floor",
 
 m8.set_macro("file:write",
   "send output to file",
-  "{str} {all}",
   {
-    {"{b}{!str_s}{ws}{!all}{e}", fn_file_write},
-    {"{b}{!str_d}{ws}{!all}{e}", fn_file_write},
+    M8::macro_t("{str} {all}", "{b}{!str_s}{ws}{!all}{e}", fn_file_write),
+    M8::macro_t("{str} {all}", "{b}{!str_d}{ws}{!all}{e}", fn_file_write),
   });
 
 m8.set_macro("file:append",
   "send output to file",
-  "{str} {all}",
   {
-    {"{b}{!str_s}{ws}{!all}{e}", fn_file_append},
-    {"{b}{!str_d}{ws}{!all}{e}", fn_file_append},
+    M8::macro_t("{str} {all}", "{b}{!str_s}{ws}{!all}{e}", fn_file_append),
+    M8::macro_t("{str} {all}", "{b}{!str_d}{ws}{!all}{e}", fn_file_append),
   });
 
 m8.set_macro("in",
@@ -1213,11 +1206,10 @@ m8.set_macro("round",
 
 m8.set_macro("date",
   "the current date timestamp",
-  "date",
   {
-    {"{empty}", fn_date},
-    {"{b}{!str_s}{e}", fn_date},
-    {"{b}{!str_d}{e}", fn_date},
+    M8::macro_t("date", "{empty}", fn_date),
+    M8::macro_t("date", "{b}{!str_s}{e}", fn_date),
+    M8::macro_t("date", "{b}{!str_d}{e}", fn_date),
   });
 
 m8.set_macro("abs",

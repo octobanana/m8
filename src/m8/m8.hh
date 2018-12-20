@@ -24,12 +24,6 @@
 
 class M8
 {
-public:
-  M8();
-  ~M8();
-
-  using Args = std::vector<std::string>;
-
   struct Core_Ctx
   {
     Core_Ctx(std::string& buf_, Reader& r_, Writer& w_, std::string ifile_, std::string ofile_):
@@ -47,6 +41,8 @@ public:
     std::string ofile;
   }; // struct Core_Ctx
 
+  using Args = std::vector<std::string>;
+
   struct Ctx
   {
     std::string& str;
@@ -56,7 +52,50 @@ public:
     // Cache& cache;
   }; // struct Ctx
 
+public:
+
   using macro_fn = std::function<int(Ctx& ctx)>;
+
+  struct macro_t
+  {
+    macro_t(std::string const& usage, std::string const& regex, macro_fn const& func) :
+      usage {usage},
+      regex {regex},
+      func {func}
+    {
+    }
+
+    std::string usage;
+    std::string regex;
+    macro_fn func;
+  };
+
+private:
+
+  enum class Mtype
+  {
+    core,
+    internal,
+    external,
+    remote
+  };
+
+  struct Macro
+  {
+    Mtype type;
+    std::string name;
+    std::string info;
+    // std::string usage;
+    // std::vector<std::pair<std::string, macro_fn>> rx_fn;
+    std::vector<macro_t> impl;
+    std::string url;
+  }; // struct Macro
+  OB::Scoped_Map<std::string, Macro> macros_;
+
+public:
+
+  M8();
+  ~M8();
 
   // set external macro
   void set_macro(std::string const& name, std::string const& info,
@@ -71,8 +110,7 @@ public:
     std::string const& usage, std::string regex, macro_fn func);
 
   // set internal macro
-  void set_macro(std::string const& name, std::string const& info,
-    std::string const& usage, std::vector<std::pair<std::string, macro_fn>> rx_fn);
+  void set_macro(std::string const& name, std::string const& info, std::vector<M8::macro_t> impl);
 
   // set core macro
   void set_core(std::string const& name, std::string const& info,
@@ -176,26 +214,6 @@ private:
     {"!str_d", "\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\""},
   };
 
-  enum class Mtype
-  {
-    core,
-    internal,
-    external,
-    remote
-  };
-
-  struct Macro
-  {
-    Mtype type;
-    std::string name;
-    std::string info;
-    // TODO allow usage for each macro_fn
-    std::string usage;
-    std::vector<std::pair<std::string, macro_fn>> rx_fn;
-    std::string url;
-  }; // struct Macro
-  OB::Scoped_Map<std::string, Macro> macros_;
-
   // abstract syntax tree
   Ast ast_;
 
@@ -215,7 +233,6 @@ private:
 
   std::string env_var(std::string const& str) const;
   std::vector<std::string> suggest_macro(std::string const& name) const;
-
 }; // class M8
 
 #endif // M8_HH

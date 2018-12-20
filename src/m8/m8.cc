@@ -250,21 +250,18 @@ void M8::core_macros()
   };
   set_macro("m8:hook+",
     "test add hook macro",
-    "1[bre] str str",
     {
-      {"{b}([bmre]{1}){ws}{!str_s}{ws}{!str_s}{e}", fn_test_hook_add},
+      M8::macro_t("1[bre] str str", "{b}([bmre]{1}){ws}{!str_s}{ws}{!str_s}{e}", fn_test_hook_add),
     });
   set_macro("m8:hook-",
     "test remove hook macro",
-    "1[bre] str",
     {
-      {"{b}([bmre]{1}){ws}{!str_s}{e}", fn_test_hook_rm},
+      M8::macro_t("1[bre] str", "{b}([bmre]{1}){ws}{!str_s}{e}", fn_test_hook_rm),
     });
   set_macro("m8:hook:info",
     "test info hook macro",
-    "1[bre]",
     {
-      {"{b}([bmre]{1}){e}", fn_test_hook_info},
+      M8::macro_t("1[bre]", "{b}([bmre]{1}){e}", fn_test_hook_info),
     });
 
 }
@@ -459,11 +456,18 @@ std::string M8::error(error_t type, Tmacro const& macro, std::string const& ifil
     // << aec::wrap("^" + std::string((macro.args.size() ? macro.args.size() - 1 : macro.args.size()), '~'), aec::fg_red)
     << "\n";
 
-    ss << "expected regex:\n";
     auto const info = macros_.find(macro.name)->second;
-    for (auto const& rf : info.rx_fn)
+    ss
+    << "expected usage/regex "
+    << OB::String::plural("pair", info.impl.size())
+    << " for '"
+    << aec::wrap(macro.name, aec::fg_white)
+    << "':\n";
+    for (auto const& e : info.impl)
     {
-      ss << "  " << aec::wrap(rf.first, aec::fg_green) << "\n";
+      ss
+      << "  " << aec::wrap(e.usage, aec::fg_white) << "\n"
+      << "    " << aec::wrap(e.regex, aec::fg_green) << "\n";
     }
 
     // ss
@@ -511,7 +515,7 @@ void M8::set_core(std::string const& name, std::string const& info,
 {
   regex = OB::String::format(regex, rx_grammar_);
   // macros_[name] = {Mtype::core, name, info, usage, {{regex, func}}, {}};
-  macros_.insert_or_assign(name, Macro({Mtype::core, name, info, usage, {{regex, func}}, {}}));
+  macros_.insert_or_assign(name, Macro({Mtype::core, name, info, {{usage, regex, func}}, {}}));
 }
 
 void M8::set_macro(std::string const& name, std::string const& info,
@@ -519,7 +523,7 @@ void M8::set_macro(std::string const& name, std::string const& info,
 {
   regex = OB::String::format(regex, rx_grammar_);
   // macros_[name] = {Mtype::external, name, info, usage, {{regex, nullptr}}, {}};
-  macros_.insert_or_assign(name, Macro({Mtype::external, name, info, usage, {{regex, nullptr}}, {}}));
+  macros_.insert_or_assign(name, Macro({Mtype::external, name, info, {{usage, regex, nullptr}}, {}}));
 }
 
 void M8::set_macro(std::string const& name, std::string const& info,
@@ -527,7 +531,7 @@ void M8::set_macro(std::string const& name, std::string const& info,
 {
   regex = OB::String::format(regex, rx_grammar_);
   // macros_[name] = {Mtype::remote, name, info, usage, {{regex, nullptr}}, url};
-  macros_.insert_or_assign(name, Macro({Mtype::remote, name, info, usage, {{regex, nullptr}}, url}));
+  macros_.insert_or_assign(name, Macro({Mtype::remote, name, info, {{usage, regex, nullptr}}, url}));
 }
 
 void M8::set_macro(std::string const& name, std::string const& info,
@@ -535,19 +539,17 @@ void M8::set_macro(std::string const& name, std::string const& info,
 {
   regex = OB::String::format(regex, rx_grammar_);
   // macros_[name] = {Mtype::internal, name, info, usage, {{regex, func}}, {}};
-  macros_.insert_or_assign(name, Macro({Mtype::internal, name, info, usage, {{regex, func}}, {}}));
+  macros_.insert_or_assign(name, Macro({Mtype::internal, name, info, {{usage, regex, func}}, {}}));
 }
 
-void M8::set_macro(std::string const& name, std::string const& info,
-  std::string const& usage,
-  std::vector<std::pair<std::string, macro_fn>> rx_fn)
+void M8::set_macro(std::string const& name, std::string const& info, std::vector<M8::macro_t> impl)
 {
-  for (auto& e : rx_fn)
+  for (auto& e : impl)
   {
-    e.first = OB::String::format(e.first, rx_grammar_);
+    e.regex = OB::String::format(e.regex, rx_grammar_);
   }
   // macros_[name] = {Mtype::internal, name, info, usage, rx_fn, {}};
-  macros_.insert_or_assign(name, Macro({Mtype::internal, name, info, usage, rx_fn, {}}));
+  macros_.insert_or_assign(name, Macro({Mtype::internal, name, info, impl, {}}));
 }
 
 void M8::set_delimits(std::string const& delim_start, std::string const& delim_end)
@@ -572,11 +574,11 @@ std::string M8::list_macros() const
   {
     ss
     << e.second.name << "\n"
-    << "  " << e.second.usage << "\n"
     << "  " << e.second.info << "\n";
-    for (auto const& e : e.second.rx_fn)
+    for (auto const& e : e.second.impl)
     {
-      ss << "  " << e.first << "\n";
+      ss << "  " << e.usage << "\n";
+      ss << "    " << e.regex << "\n";
     }
   }
 
@@ -613,11 +615,11 @@ std::string M8::macro_info(std::string const& name) const
     auto const& e = macros_.at(name);
     ss
     << e.name << "\n"
-    << "  " << e.info << "\n"
-    << "  " << e.usage << "\n";
-    for (auto const& e : e.rx_fn)
+    << "  " << e.info << "\n";
+    for (auto const& e : e.impl)
     {
-      ss << "  " << e.first << "\n";
+      ss << "  " << e.usage << "\n";
+      ss << "    " << e.regex << "\n";
     }
   }
   return ss.str();
@@ -1029,7 +1031,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
                 throw std::runtime_error("undefined name");
               }
 
-              if (it->second.rx_fn.at(0).first.empty())
+              if (it->second.impl.at(0).regex.empty())
               {
                 std::vector<std::string> reg_num {
                   {"^[\\-+]{0,1}[0-9]+$"},
@@ -1265,10 +1267,10 @@ invalid_arg:
               else
               {
                 bool invalid_regex {true};
-                if (it->second.rx_fn.size() == 1)
+                if (it->second.impl.size() == 1)
                 {
                   std::smatch match;
-                  if (std::regex_match(t.args, match, std::regex(it->second.rx_fn.at(0).first)))
+                  if (std::regex_match(t.args, match, std::regex(it->second.impl.at(0).regex)))
                   {
                     invalid_regex = false;
                     for (auto const& e : match)
@@ -1280,10 +1282,10 @@ invalid_arg:
                 else
                 {
                   std::size_t index {0};
-                  for (auto const& rf : it->second.rx_fn)
+                  for (auto const& rf : it->second.impl)
                   {
                     std::smatch match;
-                    if (std::regex_match(t.args, match, std::regex(rf.first)))
+                    if (std::regex_match(t.args, match, std::regex(rf.regex)))
                     {
                       invalid_regex = false;
                       for (auto const& e : match)
@@ -1331,14 +1333,14 @@ invalid_arg:
                 {
                   ++stats_.macro;
                   ctx.core = std::make_unique<Core_Ctx>(buf, r, w, _ifile, _ofile);
-                  ec = run_internal(it->second.rx_fn.at(t.fn_index).second, ctx);
+                  ec = run_internal(it->second.impl.at(t.fn_index).func, ctx);
                 }
 
                 // call internal
                 else if (it->second.type == Mtype::internal)
                 {
                   ++stats_.macro;
-                  ec = run_internal(it->second.rx_fn.at(t.fn_index).second, ctx);
+                  ec = run_internal(it->second.impl.at(t.fn_index).func, ctx);
                 }
 
                 // call remote
