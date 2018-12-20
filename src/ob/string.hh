@@ -9,6 +9,8 @@
 #include <optional>
 #include <regex>
 #include <limits>
+#include <utility>
+#include <map>
 
 namespace OB
 {
@@ -50,8 +52,6 @@ std::string format(std::string str, std::unordered_map<std::string, std::string>
 
 std::string xformat(std::string str, std::unordered_map<std::string, std::string> args);
 
-std::vector<std::string> correct(std::string const& str, std::vector<std::string> const& lst);
-
 std::string trim(std::string str);
 
 std::string sanitize_html(std::string str);
@@ -69,6 +69,14 @@ std::string lowercase(std::string const& str);
 bool starts_with(std::string const& str, std::string const& val);
 
 bool ends_with(std::string const& str, std::string const& val);
+
+std::vector<std::string> correct(std::string const& str, std::vector<std::string> const& lst);
+
+std::vector<std::string> bayes(std::vector<std::string> const& list, std::string str);
+
+std::size_t levenshtein(std::string const& lhs, std::string const& rhs);
+
+std::size_t damerau_levenshtein(std::string const& lhs, std::string const& rhs);
 
 } // namespace String
 

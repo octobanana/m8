@@ -39,6 +39,9 @@ using Json = nlohmann::json;
 #include <deque>
 #include <optional>
 
+#include <filesystem>
+namespace fs = std::filesystem;
+
 M8::M8()
 {
   core_macros();
@@ -266,7 +269,7 @@ void M8::core_macros()
 
 }
 
-std::string M8::error(Tmacro const& t, std::string const& ifile, std::string const& title, std::string const& body)
+std::string M8::error(Tmacro const& t, std::string const& ifile, std::string const& title, std::string const& body) const
 {
   std::stringstream ss;
 
@@ -321,6 +324,161 @@ std::string M8::error(Tmacro const& t, std::string const& ifile, std::string con
   }
 
   return ss.str();
+}
+
+std::string M8::error(error_t type, Tmacro const& macro, std::string const& ifile, std::string const& line) const
+{
+  std::stringstream ss;
+
+  ss
+  << aec::wrap(fs::canonical(ifile).string(), aec::fg_white)
+  << ":" << aec::wrap(macro.line_start, aec::fg_white);
+
+  if (macro.line_start != macro.line_end)
+  {
+    ss << "-" << aec::wrap(macro.line_end, aec::fg_white);
+  }
+
+  switch (type)
+  {
+
+  case error_t::missing_opening_delimiter:
+  {
+    ss
+    // << ":" << aec::wrap(macro.begin + 1, aec::fg_white)
+    << ": " << aec::wrap("error", aec::fg_red) << ": "
+    << "missing opening delimiter"
+    << " '" << aec::wrap(macro.name, aec::fg_white) << "'"
+    << "\n"
+    << line.substr(0, line.size() - (line.size() - macro.begin))
+    << aec::wrap(delim_end_, aec::fg_red)
+    << line.substr(macro.begin + delim_end_.size())
+    // << "\n"
+    // << std::string(line.size() - (line.size() - macro.begin), ' ')
+    // << aec::wrap("^" + std::string(delim_end_.size() - 1, '~'), aec::fg_red)
+    << "\n";
+
+    return ss.str();
+  }
+
+  case error_t::missing_closing_delimiter:
+  {
+    ss
+    // << ":" << aec::wrap(macro.begin + 1, aec::fg_white)
+    << ": " << aec::wrap("error", aec::fg_red) << ": "
+    << "missing closing delimiter"
+    << " '" << aec::wrap(delim_end_, aec::fg_white) << "'"
+    << "\n"
+    << line
+    // << "\n"
+    // << std::string(macro.begin, ' ')
+    // << aec::wrap("^", aec::fg_red)
+    << "\n";
+
+    return ss.str();
+  }
+
+  case error_t::invalid_format:
+  {
+    ss
+    // << ":" << aec::wrap(macro.begin + delim_start_.size() + 1 + macro.str.size(), aec::fg_white)
+    << ": " << aec::wrap("error", aec::fg_red) << ": "
+    << "invalid format";
+
+    if (! macro.name.empty())
+    {
+     ss
+     << " '" << aec::wrap(macro.name, aec::fg_white) << "'";
+    }
+
+    ss
+    << "\n"
+    << delim_start_ << " "
+    << aec::wrap(macro.str, aec::fg_red) << " "
+    << delim_end_
+    // << "\n"
+    // << std::string(delim_start_.size(), ' ')
+    // << aec::wrap("^~" + std::string(macro.str.size(), '~'), aec::fg_red)
+    << "\n";
+
+    return ss.str();
+  }
+
+  case error_t::undefined_name:
+  {
+    ss
+    // << ":" << aec::wrap(macro.begin + 1 + delim_start_.size() + 1, aec::fg_white)
+    << ": " << aec::wrap("error", aec::fg_red) << ": "
+    << "undefined name"
+    << " '" << aec::wrap(macro.name, aec::fg_white) << "'\n"
+    << delim_start_ << " "
+    << aec::wrap(macro.name, aec::fg_red) << " ";
+    if (! macro.args.empty())
+    {
+      ss << macro.args << " ";
+    }
+    ss
+    << delim_end_
+    // << "\n"
+    // << std::string(delim_start_.size() + 1, ' ')
+    // << aec::wrap("^" + std::string(macro.name.size() - 1, '~'), aec::fg_red)
+    << "\n";
+
+    auto similar_names = suggest_macro(macro.name);
+    if (similar_names.size() > 0)
+    {
+      ss << "did you mean:" << aec::fg_green;
+      for (auto const& e : similar_names)
+      {
+        ss << "\n  " << e;
+      }
+      ss << aec::reset << "\n";
+    }
+
+    return ss.str();
+  }
+
+  case error_t::invalid_arg:
+  {
+    ss
+    // << ":" << aec::wrap(macro.begin + 1 + delim_start_.size() + 1 + macro.name.size() + 1, aec::fg_white)
+    << ": " << aec::wrap("error", aec::fg_red) << ": "
+    << "invalid argument"
+    << " in '" << aec::wrap(macro.name, aec::fg_white) << "'"
+    << "\n"
+    << delim_start_
+    << " " << macro.name << " ";
+    if (! macro.args.empty())
+    {
+      ss << aec::wrap(macro.args, aec::fg_red) << " ";
+    }
+    ss
+    << delim_end_
+    // << "\n"
+    // << std::string(delim_start_.size() + 1 + macro.name.size() + 1, ' ')
+    // << aec::wrap("^" + std::string((macro.args.size() ? macro.args.size() - 1 : macro.args.size()), '~'), aec::fg_red)
+    << "\n";
+
+    ss << "expected regex:\n";
+    auto const info = macros_.find(macro.name)->second;
+    for (auto const& rf : info.rx_fn)
+    {
+      ss << "  " << aec::wrap(rf.first, aec::fg_green) << "\n";
+    }
+
+    // ss
+    // << delim_start_ << " "
+    // << macro.name << " "
+    // << aec::wrap(info.usage, aec::fg_white) << " "
+    // << delim_end_
+    // << "\n";
+
+    return ss.str();
+  }
+
+  default:
+    return {};
+  }
 }
 
 void M8::set_debug(bool val)
@@ -438,10 +596,10 @@ std::string M8::macro_info(std::string const& name) const
     auto similar_names = suggest_macro(name);
     if (similar_names.size() > 0)
     {
-      ss << "  Did you mean: " << aec::fg_green;
+      ss << "  Did you mean:" << aec::fg_green;
       for (auto const& e : similar_names)
       {
-        ss << e << " ";
+        ss << " " << e;
       }
       ss << aec::reset << "\n";
     }
@@ -534,44 +692,37 @@ std::string M8::summary() const
 
 std::vector<std::string> M8::suggest_macro(std::string const& name) const
 {
-  std::vector<std::string> similar_names;
-
-  std::smatch similar_match;
-  int len = (name.size() / 1.2);
-  // if (len < 2) len = name.size();
-  std::stringstream escaped_name;
-  for (auto const& e : name)
-  {
-    if (std::isalnum(e))
-    {
-      escaped_name << e;
-    }
-    else
-    {
-      escaped_name << "\\" << e;
-    }
-  }
-  std::string similar_regex {"^.*[" + escaped_name.str() + "]{" + std::to_string(len) + "}.*$"};
-
+  size_t const dist_max {7};
+  std::vector<std::pair<int, std::string>> dist;
   for (auto const& e : macros_)
   {
-    if (std::regex_match(e.first, similar_match, std::regex(similar_regex, std::regex::icase)))
+    auto const val = OB::String::damerau_levenshtein(name, e.first);
+    if (val < dist_max)
     {
-      similar_names.emplace_back(similar_match[0]);
+      dist.emplace_back(val, e.first);
     }
   }
 
-  std::sort(similar_names.begin(), similar_names.end(),
-  [](std::string const& lhs, std::string const& rhs) {
-    return lhs.size() < rhs.size();
+  std::sort(dist.begin(), dist.end(),
+  [](auto const& lhs, auto const& rhs) {
+    return lhs.first < rhs.first;
   });
 
-  if (similar_names.size() > 8)
+  std::vector<std::string> dict;
+  for (auto const& [key, val] : dist)
   {
-    similar_names.erase(similar_names.begin() + 8, similar_names.end());
+    // std::cerr << key << ": " << val << "\n";
+    dict.emplace_back(val);
+  }
+  // std::cerr << "\n";
+
+  size_t const dict_max {3};
+  if (dict.size() > dict_max)
+  {
+    dict.erase(dict.begin() + dict_max, dict.end());
   }
 
-  return similar_names;
+  return dict;
 }
 
 void M8::set_hook(Htype t, Hook h)
@@ -820,7 +971,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
             t.line_start = r.row();
             t.line_end = r.row();
             t.begin = i;
-            std::cerr << error(t, _ifile, "missing opening delimiter", r.line());
+            std::cerr << error(error_t::missing_opening_delimiter, t, _ifile, r.line());
             if (settings_.readline)
             {
               stk = std::stack<Tmacro>();
@@ -852,7 +1003,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
               }
               else
               {
-                std::cerr << error(t, _ifile, "invalid format", "could not parse macro name or arguments");
+                std::cerr << error(error_t::invalid_format, t, _ifile);
                 if (settings_.readline)
                 {
                   stk = std::stack<Tmacro>();
@@ -867,28 +1018,7 @@ void M8::parse(std::string const& _ifile, std::string const& _ofile)
               auto const it = macros_.find(t.name);
               if (it == macros_.end())
               {
-                // lookup similar macro suggestion
-                std::stringstream ss; ss
-                << "looking for similar names..."
-                << "\n";
-                auto similar_names = suggest_macro(t.name);
-                if (similar_names.size() > 0)
-                {
-                  ss
-                  << "did you mean: "
-                  << aec::fg_green;
-                  for (auto const& e : similar_names)
-                  {
-                    ss << e << " ";
-                  }
-                  ss << aec::reset;
-                }
-                else
-                {
-                  ss << aec::wrap("no suggestions found.", aec::fg_red);
-                }
-
-                std::cerr << error(t, _ifile, "undefined name", ss.str());
+                std::cerr << error(error_t::undefined_name, t, _ifile);
 
                 if (settings_.readline)
                 {
@@ -1118,7 +1248,8 @@ invalid_arg:
                     // invalid arg
                     if (settings_.readline)
                     {
-                      std::cerr << error(t, _ifile, "invalid argument", "");
+                      std::cerr << error(error_t::invalid_arg, t, _ifile);
+
                       std::cerr
                       << aec::wrap(t.match.back(), aec::fg_magenta)
                       << "\n";
@@ -1172,17 +1303,8 @@ invalid_arg:
                 if (invalid_regex)
                 {
                   // TODO fix, correct args not being listed out
-                  std::cerr << error(t, _ifile, "invalid argument", "");
-                  std::cerr
-                  << delim_start_ << " "
-                  << aec::wrap(t.name, aec::fg_white) << " "
-                  << aec::wrap(it->second.usage, aec::fg_green) << " "
-                  << delim_end_
-                  << "\n";
-                  for (auto const& rf : it->second.rx_fn)
-                  {
-                    std::cerr << aec::wrap(rf.first, aec::fg_magenta) << "\n";
-                  }
+                  std::cerr << error(error_t::invalid_arg, t, _ifile);
+
                   if (settings_.readline)
                   {
                     stk = std::stack<Tmacro>();
@@ -1411,8 +1533,8 @@ regular_char:
     t.name = delim_end_;
     t.line_start = r.row();
     t.line_end = r.row();
-    t.begin = r.line().size();
-    std::cerr << error(t, _ifile, "missing closing delimiter", r.line());
+    t.begin = r.line().size() - 1;
+    std::cerr << error(error_t::missing_closing_delimiter, t, _ifile, r.line());
     throw std::runtime_error("missing closing delimiter");
   }
 
@@ -1483,11 +1605,11 @@ int M8::run_remote(Macro const& macro, Ctx& ctx)
   int ec = send.get();
   if (ec == 0)
   {
-    std::cerr << "\033[2K\r" << "Success: remote call\n";
+    std::cerr << aec::erase_line << aec::cr << "Success: remote call\n";
   }
   else
   {
-    std::cerr << "\033[2K\r" << "Error: remote call\n";
+    std::cerr << aec::erase_line << aec::cr << "Error: remote call\n";
   }
 
   return ec;

@@ -111,9 +111,22 @@ public:
   std::string macro_info(std::string const& name) const;
 
   void parse(std::string const& _ifile = {}, std::string const& _ofile = {});
-  std::string error(Tmacro const& t, std::string const& ifile, std::string const& title, std::string const& body);
 
 private:
+
+  enum class error_t
+  {
+    missing_opening_delimiter,
+    missing_closing_delimiter,
+    invalid_format,
+    undefined_name,
+    invalid_arg,
+  };
+
+  std::string error(Tmacro const& t, std::string const& ifile, std::string const& title, std::string const& body) const;
+
+  std::string error(error_t type, Tmacro const& macro, std::string const& ifile, std::string const& line = {}) const;
+
   struct Settings
   {
     bool readline {false};
