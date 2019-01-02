@@ -486,7 +486,7 @@ void M8::set_core(std::string const& name, std::string const& info,
   std::string const& usage, std::string regex, macro_fn func)
 {
   regex = OB::String::format(regex, rx_grammar_);
-  // macros_[name] = {Mtype::core, name, info, usage, {{regex, func}}, {}};
+
   macros_.insert_or_assign(name, Macro({Mtype::core, name, info, {{usage, regex, func}}, {}}));
 }
 
@@ -494,7 +494,7 @@ void M8::set_macro(std::string const& name, std::string const& info,
   std::string const& usage, std::string regex)
 {
   regex = OB::String::format(regex, rx_grammar_);
-  // macros_[name] = {Mtype::external, name, info, usage, {{regex, nullptr}}, {}};
+
   macros_.insert_or_assign(name, Macro({Mtype::external, name, info, {{usage, regex, nullptr}}, {}}));
 }
 
@@ -502,7 +502,7 @@ void M8::set_macro(std::string const& name, std::string const& info,
   std::string const& usage, std::string regex, std::string const& url)
 {
   regex = OB::String::format(regex, rx_grammar_);
-  // macros_[name] = {Mtype::remote, name, info, usage, {{regex, nullptr}}, url};
+
   macros_.insert_or_assign(name, Macro({Mtype::remote, name, info, {{usage, regex, nullptr}}, url}));
 }
 
@@ -510,7 +510,7 @@ void M8::set_macro(std::string const& name, std::string const& info,
   std::string const& usage, std::string regex, macro_fn func)
 {
   regex = OB::String::format(regex, rx_grammar_);
-  // macros_[name] = {Mtype::internal, name, info, usage, {{regex, func}}, {}};
+
   macros_.insert_or_assign(name, Macro({Mtype::internal, name, info, {{usage, regex, func}}, {}}));
 }
 
@@ -520,7 +520,6 @@ void M8::set_macro(std::string const& name, std::string const& info, std::vector
   {
     e.regex = OB::String::format(e.regex, rx_grammar_);
   }
-  // macros_[name] = {Mtype::internal, name, info, usage, rx_fn, {}};
   macros_.insert_or_assign(name, Macro({Mtype::internal, name, info, impl, {}}));
 }
 
@@ -1288,7 +1287,6 @@ invalid_arg:
                 }
                 if (invalid_regex)
                 {
-                  // TODO fix, correct args not being listed out
                   std::cerr << error(error_t::invalid_arg, t, _ifile);
 
                   if (settings_.readline)
