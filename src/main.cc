@@ -354,6 +354,11 @@ int start_m8(OB::Parg& pg)
     std::cerr << aec::wrap("Error: ", aec::fg_red) << e.what() << "\n";
     return 1;
   }
+  catch (...)
+  {
+    std::cerr << aec::wrap("Error: ", aec::fg_red) << "an unexpected error occurred\n";
+    return 1;
+  }
 }
 
 int main(int argc, char *argv[])
