@@ -113,8 +113,8 @@ void M8::core_macros()
 
   set_core("m8:file",
     "current file name",
-    "{empty}",
-    "{empty}",
+    "[void]",
+    "{void}",
     [&](auto& ctx) {
     ctx.str = ctx.core->ifile;
     return 0;
@@ -122,8 +122,8 @@ void M8::core_macros()
 
   set_core("m8:line",
     "current line number",
-    "{empty}",
-    "{empty}",
+    "[void]",
+    "{void}",
     [&](auto& ctx) {
     ctx.str = std::to_string(ctx.core->r.row());
     return 0;
@@ -131,19 +131,21 @@ void M8::core_macros()
 
   set_core("m8:ns+",
     "namespace block",
-    "{empty}",
-    "{empty}",
+    "[void]",
+    "{void}",
     [&](auto& ctx) {
     macros_.add_scope();
+
     return 0;
     });
 
   set_core("m8:ns-",
     "namespace block",
-    "{empty}",
-    "{empty}",
+    "[void]",
+    "{void}",
     [&](auto& ctx) {
     macros_.rm_scope();
+
     return 0;
     });
 
