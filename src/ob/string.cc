@@ -1,5 +1,7 @@
 #include "ob/string.hh"
 
+#include <ctime>
+#include <cstdio>
 #include <cctype>
 #include <cstddef>
 
@@ -943,6 +945,147 @@ std::size_t damerau_levenshtein(std::string const& lhs, std::string const& rhs,
   }
 
   return v1.at(rhsv.size());
+}
+
+std::string hex_encode(char const c)
+{
+  char s[3];
+
+  if (c & 0x80)
+  {
+    std::snprintf(&s[0], 3, "%02X",
+      static_cast<unsigned int>(c & 0xff)
+    );
+  }
+  else
+  {
+    std::snprintf(&s[0], 3, "%02X",
+      static_cast<unsigned int>(c)
+    );
+  }
+
+  return std::string(s);
+}
+
+char hex_decode(std::string const& s)
+{
+  unsigned int n;
+
+  std::sscanf(s.data(), "%x", &n);
+
+  return static_cast<char>(n);
+}
+
+std::string url_encode(std::string const& str, bool form)
+{
+  std::string res;
+  res.reserve(str.size());
+
+  for (auto const& e : str)
+  {
+    if (e == ' ' && form)
+    {
+      res += "+";
+    }
+    else if (std::isalnum(static_cast<unsigned char>(e)) ||
+      e == '-' || e == '_' || e == '.' || e == '~')
+    {
+      res += e;
+    }
+    else
+    {
+      res += "%" + hex_encode(e);
+    }
+  }
+
+  return res;
+}
+
+std::string url_decode(std::string const& str, bool form)
+{
+  std::string res;
+  res.reserve(str.size());
+
+  for (std::size_t i = 0; i < str.size(); ++i)
+  {
+    if (str[i] == '+' && form)
+    {
+      res += " ";
+    }
+    else if (str[i] == '%' && i + 2 < str.size() &&
+      std::isxdigit(static_cast<unsigned char>(str[i + 1])) &&
+      std::isxdigit(static_cast<unsigned char>(str[i + 2])))
+    {
+      res += hex_decode(str.substr(i + 1, 2));
+      i += 2;
+    }
+    else
+    {
+      res += str[i];
+    }
+  }
+
+  return res;
+}
+
+std::pair<std::string, std::string> fuzzy_time(long int const sec)
+{
+  std::pair<std::string, std::string> res;
+
+  long int constexpr t_second {1};
+  long int constexpr t_minute {t_second * 60};
+  long int constexpr t_hour   {t_minute * 60};
+  long int constexpr t_day    {t_hour * 24};
+  long int constexpr t_week   {t_day * 7};
+  long int constexpr t_month  (t_day * 30.4);
+  long int constexpr t_year   {t_month * 12};
+
+  std::time_t const now {std::time(nullptr)};
+  long int const dif {now - sec};
+
+  auto const fuzzy_string = [&](long int const time_ref, std::string const time_str)
+  {
+    long int const fuzzy (dif / time_ref);
+
+    res.first = std::to_string(fuzzy);
+    res.second = time_str;
+  };
+
+  if (dif >= t_year)
+  {
+    fuzzy_string(t_year, "Y");
+  }
+  else if (dif >= t_month)
+  {
+    fuzzy_string(t_month, "M");
+  }
+  else if (dif >= t_week)
+  {
+    fuzzy_string(t_week, "W");
+  }
+  else if (dif >= t_day)
+  {
+    fuzzy_string(t_day, "D");
+  }
+  else if (dif >= t_hour)
+  {
+    fuzzy_string(t_hour, "h");
+  }
+  else if (dif >= t_minute)
+  {
+    fuzzy_string(t_minute, "m");
+  }
+  else if (dif >= t_second)
+  {
+    fuzzy_string(t_second, "s");
+  }
+  else
+  {
+    res.first = "0";
+    res.second = "s";
+  }
+
+  return res;
 }
 
 } // namespace String

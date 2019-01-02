@@ -82,6 +82,16 @@ std::size_t damerau_levenshtein(std::string const& lhs, std::string const& rhs,
   std::size_t const weight_insert = 1, std::size_t const weight_substitute = 1,
   std::size_t const weight_delete = 1, std::size_t const weight_transpose = 1);
 
+std::string hex_encode(char const c);
+
+char hex_decode(std::string const& s);
+
+std::string url_encode(std::string const& str, bool form = false);
+
+std::string url_decode(std::string const& str, bool form = false);
+
+std::pair<std::string, std::string> fuzzy_time(long int const sec);
+
 } // namespace String
 
 } // namespace OB
