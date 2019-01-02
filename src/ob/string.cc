@@ -20,18 +20,19 @@ namespace OB
 namespace String
 {
 
-std::vector<std::string> split(std::string const& str, std::string const& delim, std::size_t times)
+std::vector<std::string> split(std::string const& str, std::string const& delim, std::size_t size)
 {
   std::vector<std::string> vtok;
   std::size_t start {0};
   auto end = str.find(delim);
 
-  while ((times-- > 0) && (end != std::string::npos))
+  while ((size-- > 0) && (end != std::string::npos))
   {
     vtok.emplace_back(str.substr(start, end - start));
     start = end + delim.size();
     end = str.find(delim, start);
   }
+
   vtok.emplace_back(str.substr(start, end));
 
   return vtok;
