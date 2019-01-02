@@ -501,6 +501,25 @@ auto const fn_date = [&](auto& ctx) {
   return 0;
 };
 
+auto const fn_date2 = [&](auto& ctx) {
+  std::stringstream ss;
+  std::time_t t {std::stol(ctx.args.at(2))};
+  std::tm tm = *std::localtime(&t);
+  if (ctx.args.size() == 3)
+  {
+    auto str = ctx.args.at(1);
+    ss << std::put_time(&tm, str.c_str());
+    ctx.str = ss.str();
+  }
+  else
+  {
+    ss << std::asctime(&tm);
+    ctx.str = ss.str();
+    ctx.str.pop_back();
+  }
+  return 0;
+};
+
 auto const fn_math_round = [&](auto& ctx) {
   auto n = std::stod(ctx.args.at(1));
   n = std::round(n);
@@ -1229,9 +1248,9 @@ m8.set_macro("round",
 m8.set_macro("date",
   "the current date timestamp",
   {
-    M8::macro_t("date", "{empty}", fn_date),
-    M8::macro_t("date", "{b}{!str_s}{e}", fn_date),
-    M8::macro_t("date", "{b}{!str_d}{e}", fn_date),
+    M8::macro_t("[void]", "{void}", fn_date),
+    M8::macro_t("[date:str]", "{b}{!str_s}{e}", fn_date),
+    M8::macro_t("[date:str] [unix_timestamp:int]", "{b}{!str_s}{ws}{!num}{e}", fn_date2),
   });
 
 m8.set_macro("abs",
