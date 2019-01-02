@@ -801,6 +801,23 @@ auto const fn_def_s = [&](auto& ctx) {
   return 0;
 };
 
+auto const fn_undef = [&](auto& ctx) {
+  auto name = ctx.args.at(1);
+  auto regex = "^" + ctx.args.at(2) + "$";
+
+  m8.unset_macro(name, regex);
+
+  return 0;
+};
+
+auto const fn_undef_s = [&](auto& ctx) {
+  auto name = ctx.args.at(1);
+
+  m8.unset_macro(name);
+
+  return 0;
+};
+
 auto const fn_c = [&](auto& ctx) {
   std::string flags;
   if (db.find("c-flags") != db.end())
@@ -1139,6 +1156,13 @@ m8.set_macro("def",
     M8::macro_t("{name:wrd} {body:all}", "{b}{!wrd}{ws}(?:M8!|){!all}(?:!8M|{e})", fn_def_s),
     // {"{b}{!str_s}{ws}(?:M8!|)([^\\r]+?)(?:!8M|{e})", fn_def_s},
     // {"^(.+?)\\s+(?:M8!|)([^\\r]+?)(?:!8M|$)", fn_def_l},
+  });
+
+m8.set_macro("undef",
+  "undefine a macro",
+  {
+    M8::macro_t("[name:str]", "{b}{!str_s}{e}", fn_undef_s),
+    M8::macro_t("[name:str] [regex:str]", "{b}{!str_s}{ws}{!str_s}{e}", fn_undef),
   });
 
 m8.set_macro("c",
