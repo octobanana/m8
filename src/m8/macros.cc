@@ -364,6 +364,12 @@ auto const fn_term_width = [](auto& ctx) {
 };
 
 auto const fn_http_get = [&](auto& ctx) {
+  if (ctx.args.size() != 2)
+  {
+    ctx.err_msg = "expected URL parameter";
+    return -1;
+  }
+
   auto url = ctx.args.at(1);
   Http api;
   api.req.method = "GET";
@@ -380,6 +386,12 @@ auto const fn_http_get = [&](auto& ctx) {
 };
 
 auto const fn_http_post = [&](auto& ctx) {
+  if (ctx.args.size() != 3)
+  {
+    ctx.err_msg = "expected URL and data parameters";
+    return -1;
+  }
+
   auto url = ctx.args.at(1);
   auto data = ctx.args.at(2);
   url = OB::String::unescape(url);
