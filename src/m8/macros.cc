@@ -129,6 +129,7 @@ auto const fn_license = [](auto& ctx) {
 };
 
 auto const fn_sh = [](auto& ctx) {
+  // TODO return error on failed shell command
   return OB::exec(ctx.str, ctx.args.at(1));
 };
 
@@ -369,7 +370,12 @@ auto const fn_http_get = [&](auto& ctx) {
   api.req.url = url;
   api.run();
   ctx.str = api.res.body;
-  if (api.res.status != 200) return -1;
+
+  if (api.res.status != 200)
+  {
+    return -1;
+  }
+
   return 0;
 };
 
@@ -384,7 +390,12 @@ auto const fn_http_post = [&](auto& ctx) {
   api.req.data = data;
   api.run();
   ctx.str = api.res.body;
-  if (api.res.status != 200) return -1;
+
+  if (api.res.status != 200)
+  {
+    return -1;
+  }
+
   return 0;
 };
 
@@ -647,42 +658,42 @@ auto const fn_printc = [&](auto& ctx) {
   return 0;
 };
 
-auto const fn_def_l = [&](auto& ctx) {
-  auto delim_start = m8_delim_start;
-  auto delim_end = m8_delim_end;
+// auto const fn_def_l = [&](auto& ctx) {
+//   auto delim_start = m8_delim_start;
+//   auto delim_end = m8_delim_end;
 
-  auto name = ctx.args.at(1);
-  auto str = ctx.args.at(2);
+//   auto name = ctx.args.at(1);
+//   auto str = ctx.args.at(2);
 
-  db[name] = str;
+//   db[name] = str;
 
-  m8.set_macro(name, "def-macro", "", "", [&, name, delim_start, delim_end](auto& ctx) {
-    if (db.find(name) == db.end()) return -1;
-    auto tmp = db[name];
+//   m8.set_macro(name, "def-macro", "", "", [&, name, delim_start, delim_end](auto& ctx) {
+//     if (db.find(name) == db.end()) return -1;
+//     auto tmp = db[name];
 
-    auto arg_map = std::unordered_map<std::string, std::string>();
-    for (std::size_t i = 1; i < ctx.args.size(); ++i)
-    {
-      auto pos = ctx.args.at(i).find(":");
-      if (pos == std::string::npos) continue;
-      auto key = ctx.args.at(i).substr(0, pos);
-      auto str = ctx.args.at(i).substr(pos + 1);
-      arg_map[key] = str;
-    }
+//     auto arg_map = std::unordered_map<std::string, std::string>();
+//     for (std::size_t i = 1; i < ctx.args.size(); ++i)
+//     {
+//       auto pos = ctx.args.at(i).find(":");
+//       if (pos == std::string::npos) continue;
+//       auto key = ctx.args.at(i).substr(0, pos);
+//       auto str = ctx.args.at(i).substr(pos + 1);
+//       arg_map[key] = str;
+//     }
 
-    tmp = OB::String::xformat(tmp, arg_map);
-    if (OB::String::ends_with(tmp, "\n\n"))
-    {
-      tmp = OB::String::replace_last(tmp, "\n\n", "\n");
-    }
-    tmp = OB::String::replace_first(tmp, "`" + delim_start, delim_start);
-    tmp = OB::String::replace_last(tmp, delim_end + "`", delim_end);
-    ctx.str = tmp;
-    return 0;
-  });
+//     tmp = OB::String::xformat(tmp, arg_map);
+//     if (OB::String::ends_with(tmp, "\n\n"))
+//     {
+//       tmp = OB::String::replace_last(tmp, "\n\n", "\n");
+//     }
+//     tmp = OB::String::replace_first(tmp, "`" + delim_start, delim_start);
+//     tmp = OB::String::replace_last(tmp, delim_end + "`", delim_end);
+//     ctx.str = tmp;
+//     return 0;
+//   });
 
-  return 0;
-};
+//   return 0;
+// };
 
 auto const fn_def = [&](auto& ctx) {
   auto delim_start = m8_delim_start;
@@ -1019,8 +1030,8 @@ m8.set_macro("substr",
   "(\\d+){ws}(\\d+){ws}{!all}",
   "{b}(\\d+){ws}(\\d+){ws}{!all}{e}",
   [&](auto& ctx) {
-  auto start = std::stoi(ctx.args.at(1));
-  auto end = std::stoi(ctx.args.at(2));
+  auto start = std::stoul(ctx.args.at(1));
+  auto end = std::stoul(ctx.args.at(2));
   auto str = ctx.args.at(3);
   if (start > str.size())
   {
@@ -1087,7 +1098,6 @@ m8.set_macro("printc!",
   "",
   fn_printc);
 
-// TODO allow def same name with different args and append to fn overload
 m8.set_macro("def",
   "define a macro",
   {
