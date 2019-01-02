@@ -112,6 +112,12 @@ public:
   // set internal macro
   void set_macro(std::string const& name, std::string const& info, std::vector<M8::macro_t> impl);
 
+  // unset internal macro
+  void unset_macro(std::string const& name);
+
+  // unset internal macro
+  void unset_macro(std::string const& name, std::string regex);
+
   // set core macro
   void set_core(std::string const& name, std::string const& info,
     std::string const& usage, std::string regex, macro_fn func);

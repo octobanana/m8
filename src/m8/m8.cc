@@ -520,7 +520,58 @@ void M8::set_macro(std::string const& name, std::string const& info, std::vector
   {
     e.regex = OB::String::format(e.regex, rx_grammar_);
   }
-  macros_.insert_or_assign(name, Macro({Mtype::internal, name, info, impl, {}}));
+
+  if (auto it = macros_.find(name); it != macros_.end())
+  {
+    auto& v = it->second.impl;
+
+    for (auto const& m : impl)
+    {
+      bool found {false};
+
+      for (auto& e : v)
+      {
+        if (e.regex == m.regex)
+        {
+          e = m;
+          found = true;
+        }
+      }
+
+      if (! found)
+      {
+        v.emplace_back(m);
+      }
+    }
+  }
+  else
+  {
+    macros_.insert_or_assign(name, Macro({Mtype::internal, name, info, impl, {}}));
+  }
+}
+
+void M8::unset_macro(std::string const& name)
+{
+  macros_.erase(name);
+}
+
+void M8::unset_macro(std::string const& name, std::string regex)
+{
+  regex = OB::String::format(regex, rx_grammar_);
+
+  if (auto it = macros_.find(name); it != macros_.end())
+  {
+    auto& v = it->second.impl;
+
+    for (auto e = v.begin(); e != v.end(); ++e)
+    {
+      if (e->regex == regex)
+      {
+        v.erase(e);
+        break;
+      }
+    }
+  }
 }
 
 void M8::set_delimits(std::string const& delim_start, std::string const& delim_end)
