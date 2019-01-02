@@ -151,20 +151,23 @@ public:
     return _it.size();
   }
 
-  Scoped_Map& rm(K const& k)
+  Scoped_Map& erase(K const& k)
   {
     auto it = _map.find(k);
     if (it != _map.end())
     {
-      _map.erase(it);
-      for (auto e = _it.begin(); e < _it.end(); ++e)
+      for (auto v = _it.rbegin(); v != _it.rend(); ++v)
       {
-        if ((*e) == it)
+        for (auto e = v->begin(); e < v->end(); ++e)
         {
-          _it.erase(e);
-          break;
+          if ((*e) == it)
+          {
+            v->erase(e);
+            break;
+          }
         }
       }
+      _map.erase(it);
     }
     return *this;
   }
