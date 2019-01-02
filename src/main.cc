@@ -33,8 +33,8 @@ struct Version
 
 int program_options(OB::Parg& pg)
 {
-  Version const v {"0", "6", "1"};
-  std::string const date {"17.12.2018"};
+  Version const v {"0", "6", "2"};
+  std::string const date {"01.01.2019"};
   std::string const author {"Brett Robinson (octobanana) <octobanana.dev@gmail.com>"};
 
   pg.name("m8").version(v.major + "." + v.minor + "." + v.patch + " (" + date + ")");
