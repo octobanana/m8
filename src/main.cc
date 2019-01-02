@@ -305,6 +305,18 @@ int start_m8(OB::Parg& pg)
         throw std::runtime_error("expected input file");
       }
 
+      // setup swap directory and check if swap file already exists
+      if (! pg.get("output").empty())
+      {
+        fs::create_directories(".m8/swp");
+        std::string otmp {".m8/swp/" + OB::String::url_encode(pg.get("output")) + ".swp.m8"};
+        fs::path ofile {otmp};
+        if (fs::exists(ofile))
+        {
+          throw std::runtime_error("swap file already exists for output file '" + pg.get("output") + "'");
+        }
+      }
+
       for (auto const& e : positionals)
       {
         m8.parse(e, pg.get("output"));

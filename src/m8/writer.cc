@@ -32,7 +32,6 @@ Writer::~Writer()
 
 void Writer::open(std::string const& file_name)
 {
-  fs::create_directories(".m8/swp");
   file_name_ = file_name;
   fs::path fp {file_name_};
   file_tmp_ = ".m8/swp/" + OB::String::url_encode(fp) + file_ext_;
