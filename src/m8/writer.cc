@@ -1,6 +1,6 @@
 #include "m8/writer.hh"
 
-#include "ob/crypto.hh"
+#include "ob/string.hh"
 
 #include "ob/term.hh"
 namespace aec = OB::Term::ANSI_Escape_Codes;
@@ -35,7 +35,7 @@ void Writer::open(std::string const& file_name)
   fs::create_directories(".m8/swp");
   file_name_ = file_name;
   fs::path fp {file_name_};
-  file_tmp_ = ".m8/swp/" + OB::Crypto::sha256(fp) + file_ext_;
+  file_tmp_ = ".m8/swp/" + OB::String::url_encode(fp) + file_ext_;
   fs::path p {file_tmp_};
   file_.open(p, std::ios::app);
   if (! file_.is_open())

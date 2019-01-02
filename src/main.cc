@@ -3,7 +3,7 @@
 #include "m8/macros_custom.hh"
 
 #include "ob/timer.hh"
-#include "ob/crypto.hh"
+#include "ob/string.hh"
 
 #include "ob/term.hh"
 namespace aec = OB::Term::ANSI_Escape_Codes;
@@ -307,7 +307,7 @@ int start_m8(OB::Parg& pg)
       {
         std::string ofile {pg.get("output")};
         fs::path fp {ofile};
-        std::string otmp {".m8/swp/" + OB::Crypto::sha256(fp) + ".swp.m8"};
+        std::string otmp {".m8/swp/" + OB::String::url_encode(fp) + ".swp.m8"};
         fs::path p1 {otmp};
         fs::path p2 {ofile};
         if (! p2.parent_path().empty())
