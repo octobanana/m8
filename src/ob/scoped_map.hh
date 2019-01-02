@@ -3,8 +3,8 @@
 
 #include <cstddef>
 
-#include <stack>
 #include <deque>
+#include <vector>
 #include <utility>
 #include <unordered_map>
 #include <initializer_list>
@@ -36,7 +36,7 @@ public:
     add_scope();
     for (auto const& e : lst)
     {
-      _it.top().emplace_back(_map.insert({e.first, e.second}).first);
+      _it.back().emplace_back(_map.insert({e.first, e.second}).first);
     }
   }
 
@@ -80,7 +80,7 @@ public:
 
     if (it.second)
     {
-      _it.top().emplace_back(it.first);
+      _it.back().emplace_back(it.first);
     }
 
     return it;
@@ -92,7 +92,7 @@ public:
 
     if (it.second)
     {
-      _it.top().emplace_back(it.first);
+      _it.back().emplace_back(it.first);
     }
 
     return *this;
@@ -131,7 +131,7 @@ public:
   Scoped_Map& clear()
   {
     _map.clear();
-    _it = std::stack<std::deque<m_iterator>>();
+    _it = {};
     add_scope();
     return *this;
   }
@@ -171,7 +171,7 @@ public:
 
   Scoped_Map& add_scope()
   {
-    _it.push(std::deque<m_iterator>());
+    _it.emplace_back(std::deque<m_iterator>());
     return *this;
   }
 
@@ -179,11 +179,11 @@ public:
   {
     if (_it.size() > 1)
     {
-      for (auto& e : _it.top())
+      for (auto& e : _it.back())
       {
         _map.erase(e);
       }
-      _it.pop();
+      _it.erase(_it.end() - 1);
     }
     return *this;
   }
@@ -191,7 +191,7 @@ public:
 private:
 
   std::unordered_map<K, V> _map;
-  std::stack<std::deque<m_iterator>> _it;
+  std::vector<std::deque<m_iterator>> _it;
 }; // class Scoped_Map
 
 } // namespace OB
