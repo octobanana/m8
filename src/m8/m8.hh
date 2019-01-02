@@ -58,10 +58,10 @@ public:
 
   struct macro_t
   {
-    macro_t(std::string const& usage, std::string const& regex, macro_fn const& func) :
-      usage {usage},
-      regex {regex},
-      func {func}
+    macro_t(std::string const& usage_, std::string const& regex_, macro_fn const& func_) :
+      usage {usage_},
+      regex {regex_},
+      func {func_}
     {
     }
 
