@@ -558,42 +558,67 @@ std::string M8::list_macros() const
 
 std::string M8::macro_info(std::string const& name) const
 {
-  std::stringstream ss;
+  std::ostringstream oss;
+  OB::Term::ostream ss {oss, 2};
+  if (OB::Term::is_term(STDOUT_FILENO))
+  {
+    ss.width(OB::Term::width(STDOUT_FILENO));
+  }
+  else
+  {
+    ss.line_wrap(false);
+    ss.escape_codes(false);
+  }
+
   if (macros_.find(name) == macros_.end())
   {
     ss << aec::wrap("Error: ", aec::fg_red);
-    ss << "Undefined name '" << aec::wrap(name, aec::fg_white) << "'\n";
+    ss << "Undefined name '" << aec::wrap(name, aec::fg_red) << "'\n";
 
     // lookup similar macro suggestion
-    ss << "  Looking for similar names...\n";
     auto similar_names = suggest_macro(name);
     if (similar_names.size() > 0)
     {
-      ss << "  Did you mean:" << aec::fg_green;
+      ss
+      << "did you mean:"
+      << aec::fg_green
+      << OB::Term::iomanip::push();
+
       for (auto const& e : similar_names)
       {
-        ss << " " << e;
+        ss << e << "\n";
       }
-      ss << aec::reset << "\n";
-    }
-    else
-    {
-      ss << aec::fg_magenta << "  No suggestions found.\n" << aec::reset;
+
+      ss
+      << aec::reset
+      << OB::Term::iomanip::pop();
     }
   }
   else
   {
     auto const& e = macros_.at(name);
     ss
+    << aec::wrap("Name:\n", aec::fg_magenta)
+    << OB::Term::iomanip::push()
     << e.name << "\n"
-    << "  " << e.info << "\n";
+    << OB::Term::iomanip::pop()
+    << aec::wrap("Info:\n", aec::fg_magenta)
+    << OB::Term::iomanip::push()
+    << e.info << "\n"
+    << OB::Term::iomanip::pop()
+    << aec::wrap("Usage:\n", aec::fg_magenta);
+
     for (auto const& e : e.impl)
     {
-      ss << "  " << e.usage << "\n";
-      ss << "    " << e.regex << "\n";
+      ss
+      << OB::Term::iomanip::push()
+      << aec::wrap(e.usage, aec::fg_white) << "\n"
+      << OB::Term::iomanip::push()
+      << aec::wrap(e.regex, aec::fg_green) << "\n"
+      << OB::Term::iomanip::pop(2);
     }
   }
-  return ss.str();
+  return oss.str();
 }
 
 void M8::set_config(std::string file_name)
