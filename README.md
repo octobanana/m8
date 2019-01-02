@@ -15,7 +15,7 @@ argument regex that captures a single word.
 
 The file `hello.m8`:
 ```
-[M8[ def hello 'str' '(\w+)' Hello, {1}! ]8M]
+[M8[ def 'hello' '[name:wrd]' '(\w+)' Hello, {1}! ]8M]
 The output: [M8[ hello octobanana ]8M]
 ```
 
@@ -29,8 +29,8 @@ the 'hello' macro.
 
 The file `hello.m8`:
 ```
-[M8[ def name octobanana ]8M]
-[M8[ def hello 'str' '(\w+)' Hello, {1}! ]8M]
+[M8[ def 'name' octobanana ]8M]
+[M8[ def 'hello' '[name:wrd]' '(\w+)' Hello, {1}! ]8M]
 The output: [M8[ hello [M8[ name ]8M] ]8M]
 ```
 
@@ -121,7 +121,7 @@ Show all built-in macros.
 m8 --list
 ```
 
-Show information on a specific built-in macros.
+Show information on a specific built-in macro.
 ```
 m8 --info 'macro-name'
 ```
@@ -131,14 +131,14 @@ Process a file and print the output to stdout.
 m8 'input-file'
 ```
 
-Process a file and print the output to stdout, printing a summary out at the
-end.
+Process a file and print the output to stdout, printing a summary at the end
+to stderr.
 ```
 m8 'input-file' --summary
 ```
 
-Process a file and print the output to stdout, printing out to stderr the
-amount of time it took to run in seconds.
+Process a file and print the output to stdout, printing the amount of time it
+took to run in seconds to stderr.
 ```
 m8 'input-file' --timer
 ```
@@ -156,7 +156,7 @@ m8 'input-file' --start '[[' --end ']]'
 
 Process a file and print the output to stdout, using custom mirrored delimiter.
 ```
-m8 'input-file' --mirror '[('
+m8 'input-file' --mirror '[['
 ```
 
 Process a file and save the output to a file.
@@ -177,12 +177,33 @@ When the `-o|--output` option is used, M8 creates a temporary directory called `
 There are several examples located in the `./example` directory.
 
 ## Built-In Macros
-A list of some of the builtin/example macros:
+A list of some of the built-in macros:
+* __m8:include__ -> include a files contents
+* __m8:include_once__ -> include a files contents only once
+* __m8:file__ -> get the current file name
+* __m8:line__ -> get the current line number
+* __m8:ns+__ -> enter a new namespace block
+* __m8:ns-__ -> exit the current namespace block
 * __def__ -> define a new macro
+* __undef__ -> undefine an existing macro
 * __env__ -> get an environment variable
 * __sh__ -> execute and return the output of a shell command
 * __file__ -> read in the contents of a file
+* __sha256__ -> hash a string with sha256
+* __count__ -> count the number of times a string appears in another
 * __repeat__ -> repeat a given string a specific number of times
+* __date__ -> get the current date timestamp
+* __lowercase__ -> change case to lower
+* __uppercase__ -> change case to upper
+* __+__ -> addition operator
+* __-__ -> subtraction operator
+* __*__ -> multiplication operator
+* __/__ -> division operator
+* __%__ -> modulo operator
+* __^__ -> exponent operator
+* __abs__ -> get the absolute value of a number
+* __round__ -> get the rounded value of a number
+* __floor__ -> floor a decimal number
 
 ## Extending
 There are three types of macros, internal, external, and remote.
