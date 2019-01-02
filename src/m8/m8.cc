@@ -677,15 +677,31 @@ void M8::set_config(std::string file_name)
 
 std::string M8::summary() const
 {
-  std::stringstream ss; ss
-  << aec::wrap("Summary\n", aec::fg_magenta)
-  << aec::wrap("  Total      ", aec::fg_magenta) << aec::wrap(stats_.macro, aec::fg_green) << "\n"
-  << aec::wrap("    Internal ", aec::fg_magenta) << aec::wrap(stats_.internal, aec::fg_green) << "\n"
-  << aec::wrap("    External ", aec::fg_magenta) << aec::wrap(stats_.external, aec::fg_green) << "\n"
-  << aec::wrap("    Remote   ", aec::fg_magenta) << aec::wrap(stats_.remote, aec::fg_green) << "\n"
-  << aec::wrap("  passes     ", aec::fg_magenta) << aec::wrap(stats_.pass, aec::fg_green) << "\n"
-  << aec::wrap("  warnings   ", aec::fg_magenta) << aec::wrap(stats_.warning, aec::fg_green) << "\n";
-  return ss.str();
+  std::ostringstream oss;
+  OB::Term::ostream ss {oss, 2};
+  if (OB::Term::is_term(STDERR_FILENO))
+  {
+    ss.width(OB::Term::width(STDERR_FILENO));
+  }
+  else
+  {
+    ss.line_wrap(false);
+    ss.escape_codes(false);
+  }
+
+  ss
+  << aec::wrap("Summary\n", aec::fg_white)
+  << OB::Term::iomanip::push()
+  << aec::wrap("Total      ", aec::fg_magenta) << aec::wrap(stats_.macro, aec::fg_green) << "\n"
+  << OB::Term::iomanip::push()
+  << aec::wrap("Internal ", aec::fg_magenta) << aec::wrap(stats_.internal, aec::fg_green) << "\n"
+  << aec::wrap("External ", aec::fg_magenta) << aec::wrap(stats_.external, aec::fg_green) << "\n"
+  << aec::wrap("Remote   ", aec::fg_magenta) << aec::wrap(stats_.remote, aec::fg_green) << "\n"
+  << OB::Term::iomanip::pop()
+  << aec::wrap("passes     ", aec::fg_magenta) << aec::wrap(stats_.pass, aec::fg_green) << "\n"
+  << aec::wrap("warnings   ", aec::fg_magenta) << aec::wrap(stats_.warning, aec::fg_green) << "\n"
+  << OB::Term::iomanip::pop();
+  return oss.str();
 }
 
 std::vector<std::string> M8::suggest_macro(std::string const& name) const
