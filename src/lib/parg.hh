@@ -25,6 +25,8 @@
 #ifndef OB_PARG_HH
 #define OB_PARG_HH
 
+#include "ob/string.hh"
+
 #include <unistd.h>
 
 #include <cctype>
@@ -681,7 +683,7 @@ private:
             {
               // error
               error_ = "invalid flag '" + tmp + "'";
-              find_similar(s);
+              // find_similar(s);
 
               return -1;
             }
@@ -774,44 +776,48 @@ private:
 
   void find_similar(std::string const& name)
   {
-    std::stringstream escaped_name;
+    int const weight_max {8};
+    std::vector<std::pair<int, std::string>> dist;
 
-    for (auto const& e : name)
+    for (auto const& [key, val] : data_)
     {
-      if (std::isalnum(e))
+      int weight {0};
+
+      if (OB::String::starts_with(val.long_, name))
       {
-        escaped_name << e;
+        weight = 0;
       }
       else
       {
-        escaped_name << "\\" << e;
+        weight = OB::String::damerau_levenshtein(name, val.long_, 1, 2, 3, 0);
       }
-    }
 
-    int len = (name.size() / 1.2);
-
-    std::string similar_regex {"^.*[" + escaped_name.str() + "]{" + std::to_string(len) + "}.*$"};
-
-    std::smatch match;
-
-    for (auto const& e : data_)
-    {
-      if (std::regex_match(e.second.long_, match, std::regex(similar_regex, std::regex::icase), std::regex_constants::match_not_null))
+      if (weight < weight_max)
       {
-        similar_.emplace_back("--" + std::string(match[0]));
+        dist.emplace_back(weight, val.long_);
       }
     }
 
-    std::sort(similar_.begin(), similar_.end(),
-    [](std::string const& lhs, std::string const& rhs) {
-      return lhs.size() < rhs.size();
+    std::sort(dist.begin(), dist.end(),
+    [](auto const& lhs, auto const& rhs)
+    {
+      return (lhs.first == rhs.first) ?
+        (lhs.second.size() < rhs.second.size()) :
+        (lhs.first < rhs.first);
     });
 
-    if (similar_.size() > 8)
+    for (auto const& [key, val] : dist)
     {
-      similar_.erase(similar_.begin() + 8, similar_.end());
+      similar_.emplace_back(val);
+    }
+
+    size_t const similar__max {3};
+    if (similar_.size() > similar__max)
+    {
+      similar_.erase(similar_.begin() + similar__max, similar_.end());
     }
   }
+
 }; // class Parg
 
 } // namespace OB
