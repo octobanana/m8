@@ -84,7 +84,6 @@ int program_options(OB::Parg& pg)
   pg.set("no-copy", "do not copy outside text");
   pg.set("summary", "print out summary at end");
   pg.set("timer,t", "print out execution time in milliseconds");
-  pg.set("color", "print output in color");
   // TODO add flag to ignore empty lines
   // pg.set("ignore-empty", "ignore empty lines");
 
@@ -99,6 +98,8 @@ int program_options(OB::Parg& pg)
   pg.set("mirror,m", "", "str", "mirror the delimiter");
   pg.set("ignore", "", "regex", "regex to ignore matching names");
   pg.set("comment", "", "str", "comment symbol");
+  // TODO add option to control colored output (auto, on, off)
+  // pg.set("color", "print output in color");
   // TODO add option to define variable
   // pg.set("define,D", "", "str", "code to exec before parsing");
 
@@ -137,13 +138,6 @@ int program_options(OB::Parg& pg)
   {
     std::cerr << pg.help() << "\n";
     std::cerr << "Error: " << "pick either '--interactive' mode or file mode\n";
-    return -1;
-  }
-
-  if (pg.get<bool>("color") && (! OB::Term::is_term(STDOUT_FILENO) || ! OB::Term::is_term(STDERR_FILENO)))
-  {
-    std::cerr << pg.help() << "\n";
-    std::cerr << "Error: " << "flag 'color' can not be used on a non-interactive terminal\n";
     return -1;
   }
 
