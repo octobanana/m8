@@ -74,9 +74,13 @@ std::vector<std::string> correct(std::string const& str, std::vector<std::string
 
 std::vector<std::string> bayes(std::vector<std::string> const& list, std::string str);
 
-std::size_t levenshtein(std::string const& lhs, std::string const& rhs);
+std::size_t levenshtein(std::string const& lhs, std::string const& rhs,
+  std::size_t const weight_insert = 1, std::size_t const weight_substitute = 1,
+  std::size_t const weight_delete = 1);
 
-std::size_t damerau_levenshtein(std::string const& lhs, std::string const& rhs);
+std::size_t damerau_levenshtein(std::string const& lhs, std::string const& rhs,
+  std::size_t const weight_insert = 1, std::size_t const weight_substitute = 1,
+  std::size_t const weight_delete = 1, std::size_t const weight_transpose = 1);
 
 } // namespace String
 

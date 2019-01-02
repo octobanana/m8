@@ -1,8 +1,10 @@
 #include "ob/string.hh"
 
+#include <cctype>
 #include <cstddef>
 
 #include <string>
+#include <string_view>
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -749,79 +751,190 @@ std::vector<std::string> bayes(std::vector<std::string> const& list, std::string
   return candidates;
 }
 
-std::size_t levenshtein(std::string const& lhs, std::string const& rhs)
+std::size_t levenshtein(std::string const& lhs, std::string const& rhs,
+  std::size_t const weight_insert, std::size_t const weight_substitute,
+  std::size_t const weight_delete)
 {
-  std::size_t weight_del {3};
-  std::size_t weight_ins {1};
-  std::size_t weight_sub {2};
-
-  std::vector<std::size_t> v1 (rhs.size() + 1, 0);
-  std::vector<std::size_t> v2 (rhs.size() + 1, 0);
-
-  for (std::size_t i = 0; i <= rhs.size(); ++i)
+  if (lhs == rhs)
   {
-    v1.at(i) = i * weight_ins;
+    return 0;
   }
 
-  for (std::size_t i = 0; i < lhs.size(); ++i)
+  std::string_view lhsv {lhs};
+  std::string_view rhsv {rhs};
+
+  bool swapped {false};
+  if (lhsv.size() > rhsv.size())
   {
-    v2.at(0) = (i + 1) * weight_del;
-    for (std::size_t j = 0; j < rhs.size(); j++)
+    swapped = true;
+    std::swap(lhsv, rhsv);
+  }
+
+  for (std::size_t i = 0; i < lhsv.size(); ++i)
+  {
+    if (lhsv.at(i) != rhsv.at(i))
+    {
+      if (i)
+      {
+        lhsv.substr(i);
+        rhsv.substr(i);
+      }
+
+      break;
+    }
+  }
+
+  for (std::size_t i = 0; i < lhsv.size(); ++i)
+  {
+    if (lhsv.at(lhsv.size() - 1 - i) != rhsv.at(rhsv.size() - 1 - i))
+    {
+      if (i)
+      {
+        lhsv.substr(0, lhsv.size() - 1 - i);
+        rhsv.substr(0, rhsv.size() - 1 - i);
+      }
+
+      break;
+    }
+  }
+
+  if (swapped)
+  {
+    std::swap(lhsv, rhsv);
+  }
+
+  if (lhsv.empty())
+  {
+    return rhsv.size() * weight_insert;
+  }
+
+  if (rhsv.empty())
+  {
+    return lhsv.size() * weight_delete;
+  }
+
+  std::vector<std::size_t> v1 (rhsv.size() + 1, 0);
+  std::vector<std::size_t> v2 (rhsv.size() + 1, 0);
+
+  for (std::size_t i = 0; i <= rhsv.size(); ++i)
+  {
+    v1.at(i) = i * weight_insert;
+  }
+
+  for (std::size_t i = 0; i < lhsv.size(); ++i)
+  {
+    v2.at(0) = (i + 1) * weight_delete;
+    for (std::size_t j = 0; j < rhsv.size(); j++)
     {
       v2.at(j + 1) = std::min(
         // deletion
-        v1.at(j + 1) + weight_del,
-        // insertion
+        v1.at(j + 1) + weight_delete,
         std::min(
-          v2.at(j) + weight_ins,
+          // insertion
+          v2.at(j) + weight_insert,
           // substitution
-          v1.at(j) + (weight_sub * (lhs.at(i) != rhs.at(j)))));
+          v1.at(j) + (weight_substitute * (lhsv.at(i) != rhsv.at(j)))));
     }
 
     std::swap(v1, v2);
   }
 
-  return v1.at(rhs.size());
+  return v1.at(rhsv.size());
 }
 
-std::size_t damerau_levenshtein(std::string const& lhs, std::string const& rhs)
+std::size_t damerau_levenshtein(std::string const& lhs, std::string const& rhs,
+  std::size_t const weight_insert, std::size_t const weight_substitute,
+  std::size_t const weight_delete, std::size_t const weight_transpose)
 {
-  std::size_t weight_del {3};
-  std::size_t weight_ins {1};
-  std::size_t weight_sub {2};
-  std::size_t weight_swp {0};
-
-  std::vector<std::size_t> v0 (rhs.size() + 1, 0);
-  std::vector<std::size_t> v1 (rhs.size() + 1, 0);
-  std::vector<std::size_t> v2 (rhs.size() + 1, 0);
-
-  for (std::size_t i = 0; i <= rhs.size(); ++i)
+  if (lhs == rhs)
   {
-    v1.at(i) = i * weight_ins;
+    return 0;
   }
 
-  for (std::size_t i = 0; i < lhs.size(); ++i)
+  std::string_view lhsv {lhs};
+  std::string_view rhsv {rhs};
+
+  bool swapped {false};
+  if (lhsv.size() > rhsv.size())
   {
-    v2.at(0) = (i + 1) * weight_del;
-    for (std::size_t j = 0; j < rhs.size(); j++)
+    swapped = true;
+    std::swap(lhsv, rhsv);
+  }
+
+  for (std::size_t i = 0; i < lhsv.size(); ++i)
+  {
+    if (lhsv.at(i) != rhsv.at(i))
+    {
+      if (i)
+      {
+        lhsv.substr(i);
+        rhsv.substr(i);
+      }
+
+      break;
+    }
+  }
+
+  for (std::size_t i = 0; i < lhsv.size(); ++i)
+  {
+    if (lhsv.at(lhsv.size() - 1 - i) != rhsv.at(rhsv.size() - 1 - i))
+    {
+      if (i)
+      {
+        lhsv.substr(0, lhsv.size() - 1 - i);
+        rhsv.substr(0, rhsv.size() - 1 - i);
+      }
+
+      break;
+    }
+  }
+
+  if (swapped)
+  {
+    std::swap(lhsv, rhsv);
+  }
+
+  if (lhsv.empty())
+  {
+    return rhsv.size() * weight_insert;
+  }
+
+  if (rhsv.empty())
+  {
+    return lhsv.size() * weight_delete;
+  }
+
+  std::vector<std::size_t> v0 (rhsv.size() + 1, 0);
+  std::vector<std::size_t> v1 (rhsv.size() + 1, 0);
+  std::vector<std::size_t> v2 (rhsv.size() + 1, 0);
+
+  for (std::size_t i = 0; i <= rhsv.size(); ++i)
+  {
+    v1.at(i) = i * weight_insert;
+  }
+
+  for (std::size_t i = 0; i < lhsv.size(); ++i)
+  {
+    v2.at(0) = (i + 1) * weight_delete;
+    for (std::size_t j = 0; j < rhsv.size(); j++)
     {
       v2.at(j + 1) = std::min(
         // deletion
-        v1.at(j + 1) + weight_del,
-        // insertion
+        v1.at(j + 1) + weight_delete,
         std::min(
-          v2.at(j) + weight_ins,
+          // insertion
+          v2.at(j) + weight_insert,
           // substitution
-          v1.at(j) + (weight_sub * (lhs.at(i) != rhs.at(j)))));
+          v1.at(j) + (weight_substitute * (lhsv.at(i) != rhsv.at(j)))));
 
-      if (i && j &&
-        (lhs.at(i - 1) == rhs.at(j)) &&
-        (lhs.at(i) == rhs.at(j - 1)))
+      if (i > 0 && j > 0 &&
+        (lhsv.at(i - 1) == rhsv.at(j)) &&
+        (lhsv.at(i) == rhsv.at(j - 1)))
       {
         v2.at(j + 1) = std::min(
           v0.at(j + 1),
-          // swap
-          v0.at(j - 1) + weight_swp);
+          // transposition
+          v0.at(j - 1) + weight_transpose);
       }
     }
 
@@ -829,148 +942,8 @@ std::size_t damerau_levenshtein(std::string const& lhs, std::string const& rhs)
     std::swap(v1, v2);
   }
 
-  return v1.at(rhs.size());
+  return v1.at(rhsv.size());
 }
-
-// std::size_t levenshtein(std::string lhs, std::string rhs)
-// {
-//   std::vector<std::vector<std::size_t>> d {lhs.size() + 1, std::vector<std::size_t>(rhs.size() + 1)};
-
-//   for (std::size_t i = 0; i <= lhs.size(); ++i)
-//   {
-//     d.at(i).at(0) = i;
-//   }
-
-//   for (std::size_t i = 1; i <= rhs.size(); ++i)
-//   {
-//     d.at(0).at(i) = i;
-//   }
-
-//   for (std::size_t i = 1; i <= lhs.size(); ++i)
-//   {
-//     for (std::size_t j = 1; j <= rhs.size(); ++j)
-//     {
-//       std::size_t dist {0};
-
-//       if (lhs.at(i - 1) != rhs.at(j - 1))
-//       {
-//         dist = 1;
-//       }
-
-//       d.at(i).at(j) = std::min(
-//         // delete
-//         d.at(i-1).at(j) + 1,
-//         // insert
-//         std::min(d.at(i).at(j-1) + 1,
-//         // substitute
-//         d.at(i-1).at(j-1) + dist));
-
-//       if ((i > 1) && (j > 1) &&
-//         (lhs.at(i-1) == rhs.at(j-2)) &&
-//         (lhs.at(i-2) == rhs.at(j-1)))
-//       {
-//         d.at(i).at(j) = std::min(
-//           d.at(i).at(j),
-//           // transpose
-//           d.at(i-2).at(j-2) + dist);
-//       }
-//     }
-//   }
-
-//   return d.at(lhs.size()).at(rhs.size());
-// }
-
-// std::vector<std::vector<char>> const alphakey
-// {
-//   {'q','w','e','r','t','y','u','i','o','p'},
-//   {'a','s','d','f','g','h','j','k','l'},
-//   {'z','x','c','v','b','n','m'},
-// };
-
-// std::map<char, std::string> const alphakey
-// {
-//   {'q', "was"},
-//   {'a', "qwsxz"},
-//   {'z', "asx"},
-//   {'w', "edsaq"},
-//   {'s', "wedcxzaq"},
-//   {'x', "sdcza"},
-//   {'e', "rfdsw"},
-//   {'d', "erfvcxsw"},
-//   {'c', "dfvxs"},
-//   {'r', "tgfde"},
-//   {'f', "rtgbvcde"},
-//   {'v', "fgbcd"},
-//   {'t', ""},
-//   {'g', ""},
-//   {'b', ""},
-//   {'', ""},
-// };
-
-// std::size_t levenshtein(std::string const& lhs, std::string const& rhs, std::size_t w, std::size_t s, std::size_t a, std::size_t d)
-// {
-//   std::vector<std::size_t> v0 (rhs.size() + 1, 0);
-//   std::vector<std::size_t> v1 (rhs.size() + 1, 0);
-//   std::vector<std::size_t> v2 (rhs.size() + 1, 0);
-
-//   for (std::size_t i = 0; i <= rhs.size(); ++i)
-//   {
-//     v1.at(i) = i;
-//   }
-
-//   for (std::size_t i = 0; i < lhs.size(); ++i)
-//   {
-//     v2.at(0) = (i + 1) * d;
-//     for (std::size_t j = 0; j < rhs.size(); j++)
-//     {
-//       v2.at(j + 1) = std::min(
-//         // deletion
-//         v1.at(j + 1) + d,
-//         // insertion
-//         std::min(
-//           v2.at(j) + a,
-//           // substitution
-//           v1.at(j) + (s * (lhs.at(i) != rhs.at(j)))));
-
-//       if (i && j &&
-//         (lhs.at(i - 1) == rhs.at(j)) &&
-//         (lhs.at(i) == rhs.at(j - 1)))
-//       {
-//         v2.at(j + 1) = std::min(
-//           v0.at(j + 1),
-//           // transposition
-//           v0.at(j - 1) + w);
-//       }
-
-//       // substitution
-//       // v2.at(j + 1) = v1.at(j) + s * (lhs.at(i) != rhs.at(j));
-
-//       // swap
-//       // if (i > 0 && j > 0 && (lhs.at(i - 1) == rhs.at(j)) &&
-//       //   (lhs.at(i) == rhs.at(j - 1)) && (v2.at(j + 1) > (v0.at(j - 1) + w)))
-//       // {
-//       //   v2.at(j + 1) = v0.at(j - 1) + w;
-//       // }
-
-//       // deletion
-//       // if (v2.at(j + 1) > (v1.at(j + 1) + d))
-//       // {
-//       //   v2.at(j + 1) = v1.at(j + 1) + d;
-//       // }
-
-//       // insertion
-//       // if (v2.at(j + 1) > (v2.at(j) + a))
-//       // {
-//       //   v2.at(j + 1) = v2.at(j) + a;
-//       // }
-//     }
-
-//     std::swap(v0, v1);
-//     std::swap(v1, v2);
-//   }
-
-//   return v1.at(rhs.size());
-// }
 
 } // namespace String
 
