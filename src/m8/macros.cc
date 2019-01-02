@@ -735,11 +735,12 @@ auto const fn_def = [&](auto& ctx) {
   // TODO move this to set_macro()
   std::string rx = "^" + ctx.args.at(3) + "$";
   auto str = ctx.args.at(4);
-  db[name] = str;
+  // db[name] = str;
 
-  m8.set_macro(name, "def-macro", info, rx, [&, name, delim_start, delim_end](auto& ctx) {
-    if (db.find(name) == db.end()) return -1;
-    auto tmp = db[name];
+  m8.set_macro(name, "def-macro", {M8::macro_t(info, rx, [&, name, delim_start, delim_end, str](auto& ctx) {
+    // if (db.find(name) == db.end()) return -1;
+    // auto tmp = db[name];
+    auto tmp = str;
 
     auto arg_map = std::unordered_map<std::string, std::string>();
     for (std::size_t i = 0; i < ctx.args.size(); ++i)
@@ -758,7 +759,7 @@ auto const fn_def = [&](auto& ctx) {
     tmp = OB::String::replace_all(tmp, delim_end + "`", delim_end);
     ctx.str = tmp;
     return 0;
-  });
+  })});
 
   return 0;
 };
@@ -768,14 +769,15 @@ auto const fn_def_s = [&](auto& ctx) {
   auto delim_end = m8_delim_end;
 
   auto name = ctx.args.at(1);
-  std::string info {"{args:all}"};
-  std::string rx {"^{!all}$"};
+  std::string info {"[void]"};
+  std::string rx {"^$"};
   auto str = ctx.args.at(2);
-  db[name] = str;
+  // db[name] = str;
 
-  m8.set_macro(name, "def-macro", info, rx, [&, name, delim_start, delim_end](auto& ctx) {
-    if (db.find(name) == db.end()) return -1;
-    auto tmp = db[name];
+  m8.set_macro(name, "def-macro", {M8::macro_t(info, rx, [&, name, delim_start, delim_end, str](auto& ctx) {
+    // if (db.find(name) == db.end()) return -1;
+    // auto tmp = db[name];
+    auto tmp = str;
 
     auto arg_map = std::unordered_map<std::string, std::string>();
     for (std::size_t i = 0; i < ctx.args.size(); ++i)
@@ -794,7 +796,7 @@ auto const fn_def_s = [&](auto& ctx) {
     tmp = OB::String::replace_all(tmp, delim_end + "`", delim_end);
     ctx.str = tmp;
     return 0;
-  });
+  })});
 
   return 0;
 };
