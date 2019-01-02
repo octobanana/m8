@@ -159,9 +159,8 @@ private:
     invalid_format,
     undefined_name,
     invalid_arg,
+    failed,
   };
-
-  std::string error(Tmacro const& t, std::string const& ifile, std::string const& title, std::string const& body) const;
 
   std::string error(error_t type, Tmacro const& macro, std::string const& ifile, std::string const& line = {}) const;
 
