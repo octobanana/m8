@@ -56,10 +56,10 @@ int ftostr(std::string f, std::string& s)
   std::ifstream file {f};
   if (! file.is_open()) return -1;
   file.seekg(0, std::ios::end);
-  std::size_t size (file.tellg());
+  std::size_t size (static_cast<std::size_t>(file.tellg()));
   std::string content (size, ' ');
   file.seekg(0);
-  file.read(&content[0], size);
+  file.read(&content[0], static_cast<std::streamsize>(size));
   s = content;
   return 0;
 }
